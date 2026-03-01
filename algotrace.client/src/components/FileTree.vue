@@ -1,7 +1,9 @@
 <template>
-  <aside class="sidebar-tree">
-    <div class="tree-header">{{ title }}</div>
-    <div class="tree-content">
+  <aside class="d-flex flex-column bg-white border-end border-start" style="width: 260px; flex-shrink: 0;">
+    <div class="px-3 py-2 text-uppercase fw-bold text-secondary border-bottom" style="font-size: 11px; background-color: #f8f9fa;">
+      {{ title }}
+    </div>
+    <div class="flex-grow-1 overflow-auto p-2 custom-scrollbar">
       <FileTreeNode 
         v-for="rootNode in items" 
         :key="rootNode.name" 
@@ -22,30 +24,7 @@ defineEmits(['select']);
 </script>
 
 <style scoped>
-.sidebar-tree { 
-  width: 250px; 
-  background: #ffffff;
-  border-right: 1px solid #dee2e6; 
-  border-left: 1px solid #dee2e6;
-  display: flex; 
-  flex-direction: column; 
-}
-.tree-header { 
-  padding: 10px 15px; 
-  font-size: 11px; 
-  color: #6c757d; 
-  background: #f8f9fa;
-  text-transform: uppercase; 
-  font-weight: bold; 
-  border-bottom: 1px solid #dee2e6; 
-}
-.tree-content { 
-  flex: 1; 
-  overflow-y: auto; 
-  padding: 10px 5px; 
-}
-
-.tree-content::-webkit-scrollbar { width: 8px; }
-.tree-content::-webkit-scrollbar-thumb { background: #dee2e6; border-radius: 4px; }
-.tree-content::-webkit-scrollbar-thumb:hover { background: #adb5bd; }
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #dee2e6; border-radius: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #adb5bd; }
 </style>

@@ -1,25 +1,36 @@
 <template>
-  <div class="trace-app">
-    <header class="trace-header shadow-sm">
-      <div class="header-left">
-        <div class="overall-badge" :class="scoreClass">{{ report.info.overall_score || 0 }}%</div>
-        <div class="brand d-flex align-items-center">
-          <div class="bg-primary bg-gradient text-white rounded-3 p-1 me-2 d-flex align-items-center justify-content-center" style="width: 28px; height: 28px;">
-            <i class="bi bi-layers-half fs-6"></i>
+  <div class="vh-100 vw-100 d-flex flex-column bg-light overflow-hidden font-monospace" style="font-family: 'Inter', sans-serif;">
+    
+    <header class="d-flex align-items-center justify-content-between px-4 py-2 bg-white border-bottom shadow-sm flex-shrink-0" style="height: 60px; z-index: 10;">
+      <div class="d-flex align-items-center gap-3">
+        <button class="btn btn-light border-0 d-flex align-items-center justify-content-center" @click="$router.push('/')" style="width: 40px; height: 40px;">
+          <i class="bi bi-arrow-left fs-5 text-secondary"></i>
+        </button>
+
+        <div class="d-flex align-items-center justify-content-center rounded-circle border border-3 fw-bold" 
+             :class="scoreClass" style="width: 42px; height: 42px; font-size: 13px;">
+          {{ report.info.overall_score || 0 }}%
+        </div>
+        
+        <div class="d-flex align-items-center">
+          <div class="bg-primary bg-gradient text-white rounded p-1 me-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+            <i class="bi bi-layers-half"></i>
           </div>
           <div class="d-flex flex-column lh-1">
-            <span class="brand-main">AlgoTrace</span>
-            <span class="brand-sub">PRO ANALYZER</span>
+            <span class="fw-bolder text-dark" style="font-size: 16px; letter-spacing: -0.5px;">AlgoTrace</span>
+            <span class="text-primary fw-bold" style="font-size: 9px; letter-spacing: 1px;">PRO ANALYZER</span>
           </div>
         </div>
       </div>
-      <div class="header-right">
-        <div class="tag">{{ report.info.mode }}</div>
-        <div class="tag">{{ report.info.date }}</div>
+      
+      <div class="d-flex gap-2">
+        <span class="badge bg-light text-secondary border px-2 py-1">{{ report.info.mode }}</span>
+        <span class="badge bg-light text-secondary border px-2 py-1">{{ report.info.date }}</span>
       </div>
     </header>
 
-    <div class="trace-workspace">
+    <div class="d-flex flex-grow-1 overflow-hidden w-100">
+      
       <FileTree 
         title="Target Project" 
         :items="report.submission_tree" 
@@ -27,13 +38,15 @@
         @select="handleSelectLeft" 
       />
 
-      <div class="trace-viewer">
-        <div class="comparison-grid">
+      <div class="d-flex flex-column flex-grow-1 bg-white min-w-0">
+        <div class="d-flex h-100 w-100 min-w-0">
           
-          <div class="code-column">
-            <div class="col-header">ANALYZED: <span class="fw-normal ms-1 text-dark">{{ activeLeft?.name || 'Файл не обрано' }}</span></div>
-            <div class="code-container">
-              <div class="scroll-area" @scroll="syncLines">
+          <div class="d-flex flex-column flex-grow-1 min-w-0">
+            <div class="px-3 py-2 bg-light border-bottom text-secondary fw-bold d-flex align-items-center" style="font-size: 11px; height: 35px;">
+              ANALYZED: <span class="fw-normal text-dark ms-1">{{ activeLeft?.name || 'Файл не обрано' }}</span>
+            </div>
+            <div class="d-flex flex-grow-1 position-relative overflow-hidden min-w-0 bg-white">
+              <div class="flex-grow-1 overflow-auto py-2 position-relative w-100 custom-scrollbar" @scroll="syncLines">
                 <div v-for="(line, idx) in leftLines" :key="'l'+idx" 
                      :id="'l-line-' + (idx + 1)"
                      class="line-row" :class="getLineClass(idx + 1, 'left')">
@@ -42,28 +55,23 @@
                 </div>
               </div>
               <div class="minimap" v-if="leftLines.length > 0">
-                <div v-for="m in minimapLeft" :key="m.id" 
-                     class="minimap-marker" 
-                     :class="'marker-' + m.severity"
-                     :style="{ top: m.top + '%', height: m.height + '%' }">
-                </div>
+                <div v-for="m in minimapLeft" :key="m.id" class="minimap-marker" :class="'bg-sev-' + m.severity" :style="{ top: m.top + '%', height: m.height + '%' }"></div>
               </div>
             </div>
           </div>
 
-          <div class="connector-space">
+          <div class="connector-space bg-light border-start border-end">
             <svg class="connector-svg">
-              <path v-for="link in visualLinks" :key="link.id" 
-                    :d="link.d" 
-                    class="link-path"
-                    :class="'stroke-' + link.severity" />
+              <path v-for="link in visualLinks" :key="link.id" :d="link.d" class="link-path" :class="'stroke-' + link.severity" />
             </svg>
           </div>
 
-          <div class="code-column">
-            <div class="col-header">REFERENCE: <span class="fw-normal ms-1 text-dark">{{ activeRight?.name || 'Еталон не обрано' }}</span></div>
-            <div class="code-container">
-              <div class="scroll-area" @scroll="syncLines">
+          <div class="d-flex flex-column flex-grow-1 min-w-0">
+            <div class="px-3 py-2 bg-light border-bottom text-secondary fw-bold d-flex align-items-center" style="font-size: 11px; height: 35px;">
+              REFERENCE: <span class="fw-normal text-dark ms-1">{{ activeRight?.name || 'Еталон не обрано' }}</span>
+            </div>
+            <div class="d-flex flex-grow-1 position-relative overflow-hidden min-w-0 bg-white">
+              <div class="flex-grow-1 overflow-auto py-2 position-relative w-100 custom-scrollbar" @scroll="syncLines">
                 <div v-for="(line, idx) in rightLines" :key="'r'+idx" 
                      :id="'r-line-' + (idx + 1)"
                      class="line-row" :class="getLineClass(idx + 1, 'right')">
@@ -72,11 +80,7 @@
                 </div>
               </div>
               <div class="minimap" v-if="rightLines.length > 0">
-                <div v-for="m in minimapRight" :key="m.id" 
-                     class="minimap-marker" 
-                     :class="'marker-' + m.severity"
-                     :style="{ top: m.top + '%', height: m.height + '%' }">
-                </div>
+                <div v-for="m in minimapRight" :key="m.id" class="minimap-marker" :class="'bg-sev-' + m.severity" :style="{ top: m.top + '%', height: m.height + '%' }"></div>
               </div>
             </div>
           </div>
@@ -97,7 +101,10 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import FileTree from './FileTree.vue';
+
+const router = useRouter();
 
 const report = ref({ info: {}, submission_tree: [], reference_tree: [] });
 const activeLeft = ref(null);
@@ -111,7 +118,7 @@ const rightLines = computed(() => rightContent.value ? rightContent.value.split(
 
 const scoreClass = computed(() => {
   const s = report.value.info?.overall_score || 0;
-  return s > 75 ? 'bad' : s > 40 ? 'warn' : 'good';
+  return s > 75 ? 'border-danger text-danger' : s > 40 ? 'border-warning text-warning' : 'border-success text-success';
 });
 
 const currentMatches = computed(() => {
@@ -121,15 +128,15 @@ const currentMatches = computed(() => {
 
 const syncLines = () => {
   const links = [];
-  const headerHeight = 35; 
+  const headerHeight = 35;
 
   currentMatches.value.forEach((m, index) => {
     const lEl = document.getElementById(`l-line-${m.left_lines[0]}`);
     const rEl = document.getElementById(`r-line-${m.right_lines[0]}`);
 
     if (lEl && rEl) {
-      const lScroll = lEl.closest('.scroll-area').scrollTop;
-      const rScroll = rEl.closest('.scroll-area').scrollTop;
+      const lScroll = lEl.closest('.custom-scrollbar').scrollTop;
+      const rScroll = rEl.closest('.custom-scrollbar').scrollTop;
 
       const lPos = lEl.offsetTop + (lEl.offsetHeight / 2) - lScroll + headerHeight;
       const rPos = rEl.offsetTop + (rEl.offsetHeight / 2) - rScroll + headerHeight;
@@ -204,41 +211,19 @@ const handleSelectRight = async (file) => {
 };
 
 onMounted(async () => {
-  const res = await fetch('/data/report.json');
-  report.value = await res.json();
+  try {
+    const res = await fetch('/data/report.json');
+    report.value = await res.json();
+  } catch (e) {
+    console.error("Не вдалося завантажити звіт", e);
+  }
 });
 </script>
 
 <style scoped>
-.trace-app {
-  display: flex; flex-direction: column;
-  height: 100vh; width: 100vw;
-  background: #f8f9fa; color: #212529;
-  overflow: hidden; font-family: 'Inter', sans-serif;
-}
+.min-w-0 { min-width: 0; }
 
-.trace-header { height: 60px; background: #ffffff; border-bottom: 1px solid #dee2e6; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; flex-shrink: 0; z-index: 10; }
-.header-left { display: flex; align-items: center; gap: 15px; }
-.overall-badge { width: 40px; height: 40px; border-radius: 50%; border: 3px solid; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; }
-.overall-badge.bad { border-color: #dc3545; color: #dc3545; }
-.overall-badge.warn { border-color: #fd7e14; color: #fd7e14; }
-.overall-badge.good { border-color: #198754; color: #198754; }
-.brand-main { font-weight: 800; color: #212529; font-size: 16px; letter-spacing: -0.5px; }
-.brand-sub { font-size: 9px; color: #0d6efd; letter-spacing: 1px; font-weight: 600; }
-.header-right { display: flex; gap: 10px; }
-.tag { background: #e9ecef; padding: 4px 10px; border-radius: 6px; font-size: 10px; color: #495057; text-transform: uppercase; font-weight: 600; border: 1px solid #dee2e6; }
-
-.trace-workspace { flex: 1; display: flex; overflow: hidden; width: 100%; }
-.trace-viewer { flex: 1; display: flex; flex-direction: column; background: #ffffff; min-width: 0; }
-.comparison-grid { display: flex; height: 100%; width: 100%; min-width: 0; }
-
-.code-column { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.col-header { height: 35px; background: #f1f3f5; border-bottom: 1px solid #dee2e6; font-size: 11px; display: flex; align-items: center; padding: 0 15px; color: #6c757d; font-weight: bold; }
-.code-container { flex: 1; display: flex; position: relative; overflow: hidden; min-width: 0; background: #ffffff; }
-
-.scroll-area { flex: 1; overflow: auto; padding: 10px 0; position: relative; width: 100%; }
-
-.connector-space { width: 60px; background: #f8f9fa; border-left: 1px solid #dee2e6; border-right: 1px solid #dee2e6; position: relative; flex-shrink: 0; }
+.connector-space { width: 60px; position: relative; flex-shrink: 0; }
 .connector-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
 .link-path { fill: none; stroke-width: 2; opacity: 0.6; transition: d 0.1s ease; }
 .link-path:hover { opacity: 1; stroke-width: 3; }
@@ -249,30 +234,39 @@ onMounted(async () => {
 .stroke-purple { stroke: #6f42c1; }
 .stroke-blue { stroke: #0d6efd; }
 
+.bg-sev-high { background: #dc3545; }
+.bg-sev-med { background: #fd7e14; }
+.bg-sev-low { background: #198754; }
+.bg-sev-purple { background: #6f42c1; }
+.bg-sev-blue { background: #0d6efd; }
+
 .minimap { width: 6px; background: #f1f3f5; border-left: 1px solid #dee2e6; position: relative; z-index: 10; flex-shrink: 0; }
 .minimap-marker { position: absolute; left: 0; width: 100%; opacity: 0.8; border-radius: 1px; }
 
 .bg-match.sev-high { background: rgba(220, 53, 69, 0.1); border-left: 3px solid #dc3545; }
 mark.frag-match.sev-high { background: rgba(220, 53, 69, 0.2); border-bottom: 2px solid #dc3545; color: #212529; }
-.marker-high { background: #dc3545; }
 
 .bg-match.sev-med { background: rgba(253, 126, 20, 0.1); border-left: 3px solid #fd7e14; }
 mark.frag-match.sev-med { background: rgba(253, 126, 20, 0.2); border-bottom: 2px solid #fd7e14; color: #212529; }
-.marker-med { background: #fd7e14; }
 
 .bg-match.sev-low { background: rgba(25, 135, 84, 0.1); border-left: 3px solid #198754; }
 mark.frag-match.sev-low { background: rgba(25, 135, 84, 0.2); border-bottom: 2px solid #198754; color: #212529; }
-.marker-low { background: #198754; }
 
 .bg-match.sev-purple { background: rgba(111, 66, 193, 0.1); border-left: 3px solid #6f42c1; }
 mark.frag-match.sev-purple { background: rgba(111, 66, 193, 0.2); border-bottom: 2px solid #6f42c1; color: #212529; }
-.marker-purple { background: #6f42c1; }
 
 .bg-match.sev-blue { background: rgba(13, 110, 253, 0.1); border-left: 3px solid #0d6efd; }
 mark.frag-match.sev-blue { background: rgba(13, 110, 253, 0.2); border-bottom: 2px solid #0d6efd; color: #212529; }
-.marker-blue { background: #0d6efd; }
 
-.line-row { display: flex; padding: 0 10px; font-family: 'Fira Code', 'Courier New', monospace; font-size: 13px; line-height: 22px; border-left: 3px solid transparent; min-width: max-content; }
+.line-row { 
+  display: flex; 
+  padding: 0 10px; 
+  font-family: 'Fira Code', 'Courier New', monospace; 
+  font-size: 13px; 
+  line-height: 22px; 
+  border-left: 3px solid transparent; 
+  min-width: max-content; 
+}
 .line-row:hover { background: rgba(0, 0, 0, 0.03); }
 
 .ln { width: 40px; text-align: right; padding-right: 15px; color: #adb5bd; font-size: 11px; user-select: none; }
@@ -283,8 +277,8 @@ mark.frag-match { border-radius: 3px; padding: 0 2px; }
 .syn-str { color: #a31515; }
 .syn-num { color: #098658; }
 
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-corner { background: #f8f9fa; }
-::-webkit-scrollbar-thumb { background: #adb5bd; border-radius: 5px; border: 2px solid #ffffff; }
-::-webkit-scrollbar-thumb:hover { background: #6c757d; }
+.custom-scrollbar::-webkit-scrollbar { width: 10px; height: 10px; }
+.custom-scrollbar::-webkit-scrollbar-corner { background: #f8f9fa; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #adb5bd; border-radius: 5px; border: 2px solid #ffffff; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #6c757d; }
 </style>
