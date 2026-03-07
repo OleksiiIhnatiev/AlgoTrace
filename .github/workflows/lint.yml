@@ -29,6 +29,9 @@ jobs:
     - name: Run linter
       run: npm run lint
 
+    - name: Build and Type Check
+      run: npm run build
+
   lint-backend:
     name: Lint ASP.NET Server
     runs-on: ubuntu-latest
@@ -47,3 +50,6 @@ jobs:
 
     - name: Check formatting and linting
       run: dotnet format AlgoTrace.slnx --verify-no-changes
+
+    - name: Build project
+      run: dotnet build AlgoTrace.slnx --no-restore
