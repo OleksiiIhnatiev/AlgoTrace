@@ -39,7 +39,8 @@ namespace AlgoTrace.Server.Algorithms.Metric
 
             var boolOperators = new[] { @"\band\b", @"\bor\b" };
 
-            foreach (var pattern in branchingPatterns.Concat(boolOperators))
+            foreach (var pattern in branchingPatterns
+                .Concat(boolOperators))
             {
                 complexity += Regex.Matches(code, pattern).Count;
             }

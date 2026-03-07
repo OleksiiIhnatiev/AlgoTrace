@@ -4,7 +4,7 @@ namespace AlgoTrace.Server.Algorithms.Graph
 {
     public class ControlFlowGraphAlgorithm : IGraphAlgorithm
     {
-        public string Key => "cfg"; 
+        public string Key => "cfg";
         public string Name => "Control Flow Graph Comparison";
 
         public List<DetailedMatch> Execute(string sourceCode, string targetCode, Dictionary<string, object> parameters, out double similarityScore)

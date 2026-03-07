@@ -52,7 +52,8 @@ namespace AlgoTrace.Server.Services
                         Name = fileA?.Filename ?? "unknown",
                         Type = "file",
                         Score = (int)maxScore,
-                        DetailedMatches = new Dictionary<string, List<DetailedMatch>> {
+                        DetailedMatches = new Dictionary<string, List<DetailedMatch>>
+                        {
                             { fileB?.Filename ?? "unknown", allMatches }
                         }
                     }
