@@ -70,8 +70,8 @@ namespace AlgoTrace.Server.Algorithms.Metric
                     {
                         if (token.StartsWith("\"") || token.StartsWith("'"))
                         {
-                             if (!operandCounts.ContainsKey("LITERAL_STRING")) operandCounts["LITERAL_STRING"] = 0;
-                             operandCounts["LITERAL_STRING"]++;
+                            if (!operandCounts.ContainsKey("LITERAL_STRING")) operandCounts["LITERAL_STRING"] = 0;
+                            operandCounts["LITERAL_STRING"]++;
                         }
                         else
                         {
