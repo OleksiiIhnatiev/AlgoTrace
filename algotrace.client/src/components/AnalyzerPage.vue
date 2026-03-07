@@ -200,7 +200,7 @@ const calculateMinimap = (totalLines: number, side: 'left' | 'right') => {
     return { id: String(m.id) + side, top, height, severity: m.severity };
   });
 };
-const intentionallyBadVariable: any = "Это должно сломать сборку";
+// const intentionallyBadVariable: any = "Это должно сломать сборку";
 const minimapLeft = computed(() => calculateMinimap(leftLines.value.length, 'left'));
 const minimapRight = computed(() => calculateMinimap(rightLines.value.length, 'right'));
 
