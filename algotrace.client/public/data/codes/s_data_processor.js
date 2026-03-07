@@ -1,8 +1,8 @@
-const DATA_LIMIT = 1000;
+export const DATA_LIMIT = 1000;
 
-function processIncomingStream(dataArray) {
+export function processIncomingStream(dataArray) {
     if (!Array.isArray(dataArray)) return [];
-    
+
     const validItems = dataArray.filter(item => {
         return item !== null && item !== undefined && item.isActive === true;
     });
@@ -14,7 +14,7 @@ function processIncomingStream(dataArray) {
     }));
 
     const totalScore = normalized.reduce((sum, curr) => sum + curr.score, 0);
-    
+
     return { items: normalized, total: totalScore };
 }
 
