@@ -6,9 +6,9 @@
         {{ node.name }}
       </div>
       <div v-show="isOpen" class="folder-children">
-        <FileTreeNode 
-          v-for="child in node.children" 
-          :key="child.name" 
+        <FileTreeNode
+          v-for="child in node.children"
+          :key="child.name"
           :node="child"
           :selectedFile="selectedFile"
           :dynamicScores="dynamicScores"
@@ -29,7 +29,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue';
 
 const props = defineProps(['node', 'selectedFile', 'dynamicScores']);
@@ -37,14 +37,14 @@ defineEmits(['select']);
 
 const isOpen = ref(true);
 
-const getScore = (file) => {
+const getScore = (file: { name: string; score?: number }) => {
   if (props.dynamicScores && props.dynamicScores[file.name] !== undefined) {
     return props.dynamicScores[file.name];
   }
   return file.score;
 };
 
-const scoreColor = (s) => s > 75 ? '#f44336' : s > 40 ? '#ff9800' : '#4caf50';
+const scoreColor = (s: number) => s > 75 ? '#f44336' : s > 40 ? '#ff9800' : '#4caf50';
 </script>
 
 <style scoped>

@@ -4,9 +4,9 @@
       {{ title }}
     </div>
     <div class="flex-grow-1 overflow-auto p-2 custom-scrollbar">
-      <FileTreeNode 
-        v-for="rootNode in items" 
-        :key="rootNode.name" 
+      <FileTreeNode
+        v-for="rootNode in items"
+        :key="rootNode.name"
         :node="rootNode"
         :selectedFile="selectedFile"
         :dynamicScores="dynamicScores"
@@ -16,7 +16,7 @@
   </aside>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import FileTreeNode from './FileTreeNode.vue';
 
 defineProps(['title', 'items', 'selectedFile', 'dynamicScores']);
