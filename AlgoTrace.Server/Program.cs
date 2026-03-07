@@ -1,5 +1,8 @@
 using AlgoTrace.Server.Data;
 using AlgoTrace.Server.Models;
+using AlgoTrace.Server.Interfaces;
+using AlgoTrace.Server.Services;
+using AlgoTrace.Server.Algorithms;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
@@ -16,6 +19,11 @@ builder.Services.AddIdentityApiEndpoints<User>()
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+
+builder.Services.AddScoped<ITextAlgorithm, RabinKarpAlgorithm>();
+builder.Services.AddScoped<ITextAlgorithm, LevenshteinAlgorithm>();
+builder.Services.AddScoped<ITextAlgorithm, NgramAlgorithm>();
+builder.Services.AddScoped<ITextAnalysisService, TextAnalysisService>();
 
 var app = builder.Build();
 
