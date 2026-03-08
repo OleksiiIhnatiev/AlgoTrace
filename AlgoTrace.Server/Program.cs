@@ -36,6 +36,7 @@ builder.Services.AddScoped<IGraphAnalysisService, GraphAnalysisService>();
 builder.Services.AddScoped<IMetricAlgorithm, HalsteadMetricsAlgorithm>();
 builder.Services.AddScoped<IMetricAlgorithm, McCabeComplexityAlgorithm>();
 builder.Services.AddScoped<IMetricAnalysisService, MetricAnalysisService>();
+builder.Services.AddScoped<ISubmissionService, SubmissionService>();
 
 builder.Services.AddScoped<ITokenAlgorithm, WinnowingAlgorithm>();
 builder.Services.AddScoped<ITokenAlgorithm, JaccardTokenAlgorithm>();
@@ -43,7 +44,7 @@ builder.Services.AddScoped<ITokenAnalysisService, TokenAnalysisService>();
 
 var app = builder.Build();
 
-app.MapGroup("/identity").MapIdentityApi<User>();
+app.MapGroup("/auth").MapIdentityApi<User>();
 
 app.UseDefaultFiles();
 app.MapStaticAssets();
