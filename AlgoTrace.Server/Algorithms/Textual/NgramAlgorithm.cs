@@ -2,7 +2,7 @@
 using AlgoTrace.Server.Models.DTO;
 using AlgoTrace.Server.Utils;
 
-namespace AlgoTrace.Server.Algorithms
+namespace AlgoTrace.Server.Algorithms.Textual
 {
     public class NgramAlgorithm : ITextAlgorithm
     {

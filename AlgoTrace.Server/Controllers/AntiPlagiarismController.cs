@@ -10,16 +10,19 @@ namespace AlgoTrace.Server.Controllers
     public class AnalysisController : ControllerBase
     {
         private readonly ITextAnalysisService _textService;
+        private readonly ITokenAnalysisService _tokenService;
         private readonly IGraphAnalysisService _graphService;
         private readonly IMetricAnalysisService _metricService;
 
         public AnalysisController(
             ITextAnalysisService textService,
+            ITokenAnalysisService tokenService,
             IGraphAnalysisService graphService,
             IMetricAnalysisService metricService
         )
         {
             _textService = textService;
+            _tokenService = tokenService;
             _graphService = graphService;
             _metricService = metricService;
         }
@@ -28,6 +31,18 @@ namespace AlgoTrace.Server.Controllers
         public IActionResult CompareText([FromBody] TextCompareRequest request)
         {
             var result = _textService.Analyze(
+                request.SourceCode,
+                request.ReferenceCode,
+                request.SourceName,
+                request.RefName
+            );
+            return Ok(result);
+        }
+
+        [HttpPost("token/compare")]
+        public IActionResult CompareTokens([FromBody] TextCompareRequest request)
+        {
+            var result = _tokenService.Analyze(
                 request.SourceCode,
                 request.ReferenceCode,
                 request.SourceName,

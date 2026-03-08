@@ -1,10 +1,10 @@
 using AlgoTrace.Server.Algorithms;
 using AlgoTrace.Server.Algorithms.Graph;
 using AlgoTrace.Server.Algorithms.Metric;
+using AlgoTrace.Server.Algorithms.Textual;
 using AlgoTrace.Server.Data;
 using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models;
-using AlgoTrace.Server.Models.DTO;
 using AlgoTrace.Server.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -36,6 +36,10 @@ builder.Services.AddScoped<IGraphAnalysisService, GraphAnalysisService>();
 builder.Services.AddScoped<IMetricAlgorithm, HalsteadMetricsAlgorithm>();
 builder.Services.AddScoped<IMetricAlgorithm, McCabeComplexityAlgorithm>();
 builder.Services.AddScoped<IMetricAnalysisService, MetricAnalysisService>();
+
+builder.Services.AddScoped<ITokenAlgorithm, WinnowingAlgorithm>();
+builder.Services.AddScoped<ITokenAlgorithm, JaccardTokenAlgorithm>();
+builder.Services.AddScoped<ITokenAnalysisService, TokenAnalysisService>();
 
 var app = builder.Build();
 

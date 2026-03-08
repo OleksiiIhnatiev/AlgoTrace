@@ -4,7 +4,7 @@ using AlgoTrace.Server.Utils;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
-namespace AlgoTrace.Server.Algorithms
+namespace AlgoTrace.Server.Algorithms.Textual
 {
     public class LineByLineAlgorithm : ITextAlgorithm
     {

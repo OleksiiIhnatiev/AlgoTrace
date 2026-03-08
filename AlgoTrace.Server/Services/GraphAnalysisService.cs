@@ -1,3 +1,4 @@
+using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO;
 
 namespace AlgoTrace.Server.Services
