@@ -4,6 +4,11 @@ namespace AlgoTrace.Server.Interfaces
 {
     public interface ITokenAnalysisService
     {
-        AnalysisResponseDto Analyze(string source, string reference, string sourceName, string refName);
+        AnalysisResponseDto Analyze(
+            string source,
+            string reference,
+            string sourceName,
+            string refName
+        );
     }
 }

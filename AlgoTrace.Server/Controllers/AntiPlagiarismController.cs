@@ -1,6 +1,5 @@
 ﻿using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO;
-using AlgoTrace.Server.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AlgoTrace.Server.Controllers

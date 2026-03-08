@@ -1,6 +1,6 @@
+using System.Text.RegularExpressions;
 using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO;
-using System.Text.RegularExpressions;
 
 namespace AlgoTrace.Server.Services
 {
@@ -13,7 +13,12 @@ namespace AlgoTrace.Server.Services
             _algorithms = algorithms;
         }
 
-        public AnalysisResponseDto Analyze(string source, string reference, string sourceName, string refName)
+        public AnalysisResponseDto Analyze(
+            string source,
+            string reference,
+            string sourceName,
+            string refName
+        )
         {
             var sourceTokens = Tokenize(source);
             var referenceTokens = Tokenize(reference);
@@ -25,7 +30,8 @@ namespace AlgoTrace.Server.Services
             {
                 var matches = algo.Execute(sourceTokens, referenceTokens, out double score);
                 allMatches.AddRange(matches);
-                if (score > maxScore) maxScore = score;
+                if (score > maxScore)
+                    maxScore = score;
             }
 
             return new AnalysisResponseDto
@@ -34,23 +40,35 @@ namespace AlgoTrace.Server.Services
                 {
                     OverallScore = (int)maxScore,
                     Mode = "Lexical Token Analysis",
-                    Date = DateTime.Now.ToString("dd.MM.yyyy")
+                    Date = DateTime.Now.ToString("dd.MM.yyyy"),
                 },
-                SubmissionTree = new List<NodeDto> {
-                    new NodeDto {
+                SubmissionTree = new List<NodeDto>
+                {
+                    new NodeDto
+                    {
                         Name = sourceName,
                         Path = sourceName,
                         Type = "file",
                         Score = (int)maxScore,
-                        ReferenceScores = new Dictionary<string, int> { { refName, (int)maxScore } },
-                        DetailedMatches = new Dictionary<string, List<DetailedMatch>> {
-                            { refName, allMatches }
-                        }
-                    }
+                        ReferenceScores = new Dictionary<string, int>
+                        {
+                            { refName, (int)maxScore },
+                        },
+                        DetailedMatches = new Dictionary<string, List<DetailedMatch>>
+                        {
+                            { refName, allMatches },
+                        },
+                    },
                 },
-                ReferenceTree = new List<NodeDto> {
-                    new NodeDto { Name = refName, Path = refName, Type = "file" }
-                }
+                ReferenceTree = new List<NodeDto>
+                {
+                    new NodeDto
+                    {
+                        Name = refName,
+                        Path = refName,
+                        Type = "file",
+                    },
+                },
             };
         }
 
@@ -61,7 +79,8 @@ namespace AlgoTrace.Server.Services
 
             for (int i = 0; i < lines.Length; i++)
             {
-                var words = lines[i].Split(new[] { ' ', '\t', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                var words = lines[i]
+                    .Split(new[] { ' ', '\t', '\r' }, StringSplitOptions.RemoveEmptyEntries);
                 foreach (var word in words)
                 {
                     tokens.Add(new TokenInfo { Value = word, Line = i + 1 });
