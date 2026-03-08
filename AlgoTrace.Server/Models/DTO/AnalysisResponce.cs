@@ -3,7 +3,12 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AlgoTrace.Server.Models.DTO
 {
-    public record AnalysisRequest(string SourceCode, string ReferenceCode, string SourcePath, string ReferencePath);
+    public record AnalysisRequest(
+        string SourceCode,
+        string ReferenceCode,
+        string SourcePath,
+        string ReferencePath
+    );
 
     public class AnalysisResponseDto
     {

@@ -13,7 +13,12 @@ namespace AlgoTrace.Server.Services
             _algorithms = algorithms;
         }
 
-        public AnalysisResponseDto Analyze(string source, string reference, string sourcePath, string refPath)
+        public AnalysisResponseDto Analyze(
+            string source,
+            string reference,
+            string sourcePath,
+            string refPath
+        )
         {
             var allMatches = new List<DetailedMatch>();
             double maxScore = 0;
@@ -22,7 +27,8 @@ namespace AlgoTrace.Server.Services
             {
                 var matches = algo.Execute(source, reference, out double score);
                 allMatches.AddRange(matches);
-                if (score > maxScore) maxScore = score;
+                if (score > maxScore)
+                    maxScore = score;
             }
 
             var optimizedMatches = CollapseMatches(allMatches);
@@ -36,34 +42,48 @@ namespace AlgoTrace.Server.Services
                 {
                     OverallScore = (int)maxScore,
                     Mode = "Multi-Layer Textual Analysis",
-                    Date = DateTime.Now.ToString("dd.MM.yyyy")
+                    Date = DateTime.Now.ToString("dd.MM.yyyy"),
                 },
-                SubmissionTree = new List<NodeDto> {
-                    new NodeDto {
+                SubmissionTree = new List<NodeDto>
+                {
+                    new NodeDto
+                    {
                         Name = sourceFileName,
                         Path = sourcePath,
                         Type = "file",
                         Score = (int)maxScore,
-                        ReferenceScores = new Dictionary<string, int> { { refFileName, (int)maxScore } },
-                        DetailedMatches = new Dictionary<string, List<DetailedMatch>> {
-                            { refFileName, optimizedMatches }
-                        }
-                    }
+                        ReferenceScores = new Dictionary<string, int>
+                        {
+                            { refFileName, (int)maxScore },
+                        },
+                        DetailedMatches = new Dictionary<string, List<DetailedMatch>>
+                        {
+                            { refFileName, optimizedMatches },
+                        },
+                    },
                 },
-                ReferenceTree = new List<NodeDto> {
-                    new NodeDto { Name = refFileName, Path = refPath, Type = "file" }
-                }
+                ReferenceTree = new List<NodeDto>
+                {
+                    new NodeDto
+                    {
+                        Name = refFileName,
+                        Path = refPath,
+                        Type = "file",
+                    },
+                },
             };
         }
 
         private List<DetailedMatch> CollapseMatches(List<DetailedMatch> matches)
         {
-            if (!matches.Any()) return matches;
+            if (!matches.Any())
+                return matches;
 
             var sorted = matches.OrderBy(m => m.LeftLines[0]).ToList();
             var result = new List<DetailedMatch>();
 
-            if (sorted.Count == 0) return result;
+            if (sorted.Count == 0)
+                return result;
 
             var current = sorted[0];
 
@@ -76,7 +96,8 @@ namespace AlgoTrace.Server.Services
                     current.LeftLines[1] = Math.Max(current.LeftLines[1], next.LeftLines[1]);
                     current.RightLines[1] = Math.Max(current.RightLines[1], next.RightLines[1]);
 
-                    if (next.Severity == "high") current.Severity = "high";
+                    if (next.Severity == "high")
+                        current.Severity = "high";
                 }
                 else
                 {
@@ -86,7 +107,8 @@ namespace AlgoTrace.Server.Services
             }
             result.Add(current);
 
-            for (int i = 0; i < result.Count; i++) result[i].Id = i + 1;
+            for (int i = 0; i < result.Count; i++)
+                result[i].Id = i + 1;
 
             return result;
         }

@@ -20,7 +20,8 @@ namespace AlgoTrace.Server.Algorithms
             for (int i = 0; i < sLines.Length; i++)
             {
                 string sNorm = SourceNormalizer.NormalizeLine(sLines[i]);
-                if (sNorm.Length < 8) continue; // Игнорируем шум (скобки, пустые строки)
+                if (sNorm.Length < 8)
+                    continue; // Игнорируем шум (скобки, пустые строки)
 
                 for (int j = 0; j < tLines.Length; j++)
                 {
@@ -33,7 +34,11 @@ namespace AlgoTrace.Server.Algorithms
             }
 
             var merged = new List<DetailedMatch>();
-            if (!rawMatches.Any()) { similarityScore = 0; return merged; }
+            if (!rawMatches.Any())
+            {
+                similarityScore = 0;
+                return merged;
+            }
 
             // 2. Группируем идущие подряд строки в один фрагмент
             int startS = rawMatches[0].sIdx;
@@ -51,14 +56,16 @@ namespace AlgoTrace.Server.Algorithms
                 }
                 else
                 {
-                    merged.Add(new DetailedMatch
-                    {
-                        Id = new Random().Next(1000, 9999),
-                        Type = "Code Block Clone",
-                        LeftLines = new List<int> { startS, lastS },
-                        RightLines = new List<int> { startT, lastT },
-                        Severity = (lastS - startS) > 3 ? "high" : "med"
-                    });
+                    merged.Add(
+                        new DetailedMatch
+                        {
+                            Id = new Random().Next(1000, 9999),
+                            Type = "Code Block Clone",
+                            LeftLines = new List<int> { startS, lastS },
+                            RightLines = new List<int> { startT, lastT },
+                            Severity = (lastS - startS) > 3 ? "high" : "med",
+                        }
+                    );
                     startS = rawMatches[i].sIdx;
                     startT = rawMatches[i].tIdx;
                     lastS = startS;
@@ -66,16 +73,19 @@ namespace AlgoTrace.Server.Algorithms
                 }
             }
             // Добавляем последний найденный блок
-            merged.Add(new DetailedMatch
-            {
-                Id = new Random().Next(1000, 9999),
-                Type = "Code Block Clone",
-                LeftLines = new List<int> { startS, lastS },
-                RightLines = new List<int> { startT, lastT },
-                Severity = (lastS - startS) > 3 ? "high" : "med"
-            });
+            merged.Add(
+                new DetailedMatch
+                {
+                    Id = new Random().Next(1000, 9999),
+                    Type = "Code Block Clone",
+                    LeftLines = new List<int> { startS, lastS },
+                    RightLines = new List<int> { startT, lastT },
+                    Severity = (lastS - startS) > 3 ? "high" : "med",
+                }
+            );
 
-            similarityScore = (double)rawMatches.Count / Math.Max(sLines.Length, tLines.Length) * 100;
+            similarityScore =
+                (double)rawMatches.Count / Math.Max(sLines.Length, tLines.Length) * 100;
             return merged;
         }
     }
