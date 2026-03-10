@@ -1,10 +1,11 @@
 using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO;
 
-namespace AlgoTrace.Server.Algorithms
+namespace AlgoTrace.Server.Algorithms.Token
 {
     public class JaccardTokenAlgorithm : ITokenAlgorithm
     {
+        public string Key => "jaccard_token";
         public string Name => "Jaccard Token Similarity";
 
         public List<DetailedMatch> Execute(
@@ -13,18 +14,25 @@ namespace AlgoTrace.Server.Algorithms
             out double similarityScore
         )
         {
+            if (sourceTokens == null || !sourceTokens.Any() || targetTokens == null || !targetTokens.Any())
+            {
+                similarityScore = 0;
+                return new List<DetailedMatch>();
+            }
+
             var set1 = sourceTokens.Select(t => t.Value).ToHashSet();
             var set2 = targetTokens.Select(t => t.Value).ToHashSet();
 
             double intersection = set1.Intersect(set2).Count();
             double union = set1.Union(set2).Count();
-            similarityScore = (intersection / union) * 100;
+
+            similarityScore = union > 0 ? (intersection / union) * 100 : 0;
 
             return new List<DetailedMatch>
             {
                 new DetailedMatch
                 {
-                    Id = 202,
+                    Id = 5001,
                     Type = "Token Vocabulary Similarity",
                     Severity = similarityScore > 80 ? "high" : "low",
                     LeftLines = new List<int>

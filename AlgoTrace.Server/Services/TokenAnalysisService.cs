@@ -13,79 +13,97 @@ namespace AlgoTrace.Server.Services
             _algorithms = algorithms;
         }
 
-        public AnalysisResponseDto Analyze(
-            string source,
-            string reference,
-            string sourceName,
-            string refName
-        )
+        public AnalysisResponse Analyze(AnalysisRequest request)
         {
-            var sourceTokens = Tokenize(source);
-            var referenceTokens = Tokenize(reference);
+            var submissionNodes = new List<NodeDto>();
+            double globalMaxScore = 0;
+            var requestedMethods = request.AnalysisConfig?.Methods ?? new List<string>();
 
-            var allMatches = new List<DetailedMatch>();
-            double maxScore = 0;
-
-            foreach (var algo in _algorithms)
+            foreach (var fileA in request.SubmissionA.Files)
             {
-                var matches = algo.Execute(sourceTokens, referenceTokens, out double score);
-                allMatches.AddRange(matches);
-                if (score > maxScore)
-                    maxScore = score;
+                var fileNode = new NodeDto
+                {
+                    Name = fileA.Filename,
+                    Path = fileA.Filename,
+                    Type = "file",
+                    ReferenceScores = new Dictionary<string, int>(),
+                    DetailedMatches = new Dictionary<string, List<DetailedMatch>>()
+                };
+
+                var sourceTokens = Tokenize(fileA.Content);
+                double fileBestScore = 0;
+
+                foreach (var fileB in request.SubmissionB.Files)
+                {
+                    var referenceTokens = Tokenize(fileB.Content);
+                    var pairMatches = new List<DetailedMatch>();
+                    double pairMaxScore = 0;
+
+                    foreach (var algo in _algorithms)
+                    {
+                        string algoKey = algo.Name.ToLower().Replace(" ", "_");
+
+                        if (requestedMethods.Any() && !requestedMethods.Contains(algoKey))
+                            continue;
+
+                        var matches = algo.Execute(sourceTokens, referenceTokens, out double score);
+
+                        pairMatches.AddRange(matches);
+                        if (score > pairMaxScore)
+                            pairMaxScore = score;
+                    }
+
+                    fileNode.DetailedMatches[fileB.Filename] = pairMatches;
+                    fileNode.ReferenceScores[fileB.Filename] = (int)pairMaxScore;
+
+                    if (pairMaxScore > fileBestScore)
+                        fileBestScore = pairMaxScore;
+                }
+
+                fileNode.Score = (int)fileBestScore;
+                if (fileBestScore > globalMaxScore)
+                    globalMaxScore = fileBestScore;
+
+                submissionNodes.Add(fileNode);
             }
 
-            return new AnalysisResponseDto
+            return new AnalysisResponse
             {
                 Info = new AnalysisInfo
                 {
-                    OverallScore = (int)maxScore,
+                    OverallScore = (int)globalMaxScore,
                     Mode = "Lexical Token Analysis",
                     Date = DateTime.Now.ToString("dd.MM.yyyy"),
                 },
-                SubmissionTree = new List<NodeDto>
+                SubmissionTree = submissionNodes,
+                ReferenceTree = request.SubmissionB.Files.Select(f => new NodeDto
                 {
-                    new NodeDto
-                    {
-                        Name = sourceName,
-                        Path = sourceName,
-                        Type = "file",
-                        Score = (int)maxScore,
-                        ReferenceScores = new Dictionary<string, int>
-                        {
-                            { refName, (int)maxScore },
-                        },
-                        DetailedMatches = new Dictionary<string, List<DetailedMatch>>
-                        {
-                            { refName, allMatches },
-                        },
-                    },
-                },
-                ReferenceTree = new List<NodeDto>
-                {
-                    new NodeDto
-                    {
-                        Name = refName,
-                        Path = refName,
-                        Type = "file",
-                    },
-                },
+                    Name = f.Filename,
+                    Path = f.Filename,
+                    Type = "file"
+                }).ToList()
             };
         }
 
-        public List<TokenInfo> Tokenize(string code)
+        private List<TokenInfo> Tokenize(string code)
         {
             var tokens = new List<TokenInfo>();
-            var lines = code.Split('\n');
+            var noComments = Regex.Replace(code, @"//.*|/\*[\s\S]*?\*/", " ");
 
-            for (int i = 0; i < lines.Length; i++)
+            string normalized = noComments;
+            normalized = Regex.Replace(normalized, @"""[^""""]*""", " STR ");
+            normalized = Regex.Replace(normalized, @"\b\d+\b", " NUM ");
+            normalized = Regex.Replace(normalized, @"\b(if|else|for|while|return|class|public|private|static|int|string|void|var)\b", " KEY ");
+            normalized = Regex.Replace(normalized, @"[a-zA-Z_][a-zA-Z0-9_]*", " ID ");
+
+            var words = normalized.Split(new[] { ' ', '\t', '\n', '\r', '{', '}', '(', ')', ';', ',' },
+                StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var word in words)
             {
-                var words = lines[i]
-                    .Split(new[] { ' ', '\t', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-                foreach (var word in words)
-                {
-                    tokens.Add(new TokenInfo { Value = word, Line = i + 1 });
-                }
+                tokens.Add(new TokenInfo { Value = word, Line = 0 });
             }
+
             return tokens;
         }
     }

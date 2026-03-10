@@ -6,11 +6,6 @@ namespace AlgoTrace.Server.Interfaces
 {
     public interface ITextAnalysisService
     {
-        AnalysisResponseDto Analyze(
-            string source,
-            string reference,
-            string sourcePath,
-            string refPath
-        );
+        AnalysisResponse Analyze(AnalysisRequest request);
     }
 }

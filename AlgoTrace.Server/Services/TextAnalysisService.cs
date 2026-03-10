@@ -1,6 +1,5 @@
 ﻿using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO;
-using AlgoTrace.Server.Utils;
 
 namespace AlgoTrace.Server.Services
 {
@@ -13,77 +12,83 @@ namespace AlgoTrace.Server.Services
             _algorithms = algorithms;
         }
 
-        public AnalysisResponseDto Analyze(
-            string source,
-            string reference,
-            string sourcePath,
-            string refPath
-        )
+        public AnalysisResponse Analyze(AnalysisRequest request)
         {
-            var allMatches = new List<DetailedMatch>();
-            double maxScore = 0;
+            var submissionNodes = new List<NodeDto>();
+            double globalMaxScore = 0;
+            var requestedMethods = request.AnalysisConfig?.Methods ?? new List<string>();
 
-            foreach (var algo in _algorithms)
+            foreach (var fileA in request.SubmissionA.Files)
             {
-                var matches = algo.Execute(source, reference, out double score);
-                allMatches.AddRange(matches);
-                if (score > maxScore)
-                    maxScore = score;
+                var fileNode = new NodeDto
+                {
+                    Name = fileA.Filename,
+                    Path = fileA.Filename,
+                    Type = "file",
+                    ReferenceScores = new Dictionary<string, int>(),
+                    DetailedMatches = new Dictionary<string, List<DetailedMatch>>()
+                };
+
+                double fileBestScore = 0;
+
+                foreach (var fileB in request.SubmissionB.Files)
+                {
+                    var pairMatches = new List<DetailedMatch>();
+                    double pairMaxScore = 0;
+
+                    foreach (var algo in _algorithms)
+                    {
+                        if (requestedMethods.Any() && !requestedMethods.Contains(algo.Name.ToLower().Replace(" ", "_")))
+                            continue;
+
+                        var matches = algo.Execute(fileA.Content, fileB.Content, out double score);
+
+                        pairMatches.AddRange(matches);
+                        if (score > pairMaxScore)
+                            pairMaxScore = score;
+                    }
+
+                    var optimizedMatches = CollapseMatches(pairMatches);
+
+                    fileNode.DetailedMatches[fileB.Filename] = optimizedMatches;
+                    fileNode.ReferenceScores[fileB.Filename] = (int)pairMaxScore;
+
+                    if (pairMaxScore > fileBestScore)
+                        fileBestScore = pairMaxScore;
+                }
+
+                fileNode.Score = (int)fileBestScore;
+                if (fileBestScore > globalMaxScore)
+                    globalMaxScore = fileBestScore;
+
+                submissionNodes.Add(fileNode);
             }
 
-            var optimizedMatches = CollapseMatches(allMatches);
-
-            var sourceFileName = Path.GetFileName(sourcePath);
-            var refFileName = Path.GetFileName(refPath);
-
-            return new AnalysisResponseDto
+            return new AnalysisResponse
             {
                 Info = new AnalysisInfo
                 {
-                    OverallScore = (int)maxScore,
-                    Mode = "Multi-Layer Textual Analysis",
+                    OverallScore = (int)globalMaxScore,
+                    Mode = "Multi-File Textual Analysis",
                     Date = DateTime.Now.ToString("dd.MM.yyyy"),
                 },
-                SubmissionTree = new List<NodeDto>
+                SubmissionTree = submissionNodes,
+                ReferenceTree = request.SubmissionB.Files.Select(f => new NodeDto
                 {
-                    new NodeDto
-                    {
-                        Name = sourceFileName,
-                        Path = sourcePath,
-                        Type = "file",
-                        Score = (int)maxScore,
-                        ReferenceScores = new Dictionary<string, int>
-                        {
-                            { refFileName, (int)maxScore },
-                        },
-                        DetailedMatches = new Dictionary<string, List<DetailedMatch>>
-                        {
-                            { refFileName, optimizedMatches },
-                        },
-                    },
-                },
-                ReferenceTree = new List<NodeDto>
-                {
-                    new NodeDto
-                    {
-                        Name = refFileName,
-                        Path = refPath,
-                        Type = "file",
-                    },
-                },
+                    Name = f.Filename,
+                    Path = f.Filename,
+                    Type = "file"
+                }).ToList()
             };
         }
 
         private List<DetailedMatch> CollapseMatches(List<DetailedMatch> matches)
         {
-            if (!matches.Any())
-                return matches;
+            if (matches == null || !matches.Any())
+                return new List<DetailedMatch>();
 
             var sorted = matches.OrderBy(m => m.LeftLines[0]).ToList();
             var result = new List<DetailedMatch>();
-
-            if (sorted.Count == 0)
-                return result;
 
             var current = sorted[0];
 

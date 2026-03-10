@@ -1,13 +1,12 @@
 ﻿using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO;
 using AlgoTrace.Server.Utils;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 
 namespace AlgoTrace.Server.Algorithms.Textual
 {
     public class LevenshteinAlgorithm : ITextAlgorithm
     {
+        public string Key => "levenshtein";
         public string Name => "Levenshtein Line Comparison";
 
         public List<DetailedMatch> Execute(string source, string target, out double similarityScore)
@@ -31,16 +30,14 @@ namespace AlgoTrace.Server.Algorithms.Textual
 
                     if (ratio > 0.85)
                     {
-                        matches.Add(
-                            new DetailedMatch
-                            {
-                                Id = i + 2000,
-                                Type = "Fuzzy Line Match",
-                                LeftLines = new List<int> { i + 1, i + 1 },
-                                RightLines = new List<int> { j + 1, j + 1 },
-                                Severity = "med",
-                            }
-                        );
+                        matches.Add(new DetailedMatch
+                        {
+                            Id = i + 2000,
+                            Type = "Fuzzy Line Match",
+                            LeftLines = new List<int> { i + 1, i + 1 },
+                            RightLines = new List<int> { j + 1, j + 1 },
+                            Severity = "med"
+                        });
                         matchCount++;
                         break;
                     }
@@ -52,8 +49,7 @@ namespace AlgoTrace.Server.Algorithms.Textual
 
         private int ComputeDistance(string s, string t)
         {
-            int n = s.Length,
-                m = t.Length;
+            int n = s.Length, m = t.Length;
             int[,] d = new int[n + 1, m + 1];
             for (int i = 0; i <= n; d[i, 0] = i++) { }
             for (int j = 0; j <= m; d[0, j] = j++) { }

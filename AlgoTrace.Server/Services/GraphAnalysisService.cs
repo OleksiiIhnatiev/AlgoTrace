@@ -12,57 +12,74 @@ namespace AlgoTrace.Server.Services
             _algorithms = algorithms;
         }
 
-        public AnalysisResponseDto Analyze(GraphAnalysisRequest request)
+        public AnalysisResponse Analyze(AnalysisRequest request)
         {
-            var allMatches = new List<DetailedMatch>();
-            double maxScore = 0;
+            var submissionNodes = new List<NodeDto>();
+            double globalMaxScore = 0;
             var requestedMethods = request.AnalysisConfig?.Methods ?? new List<string>();
 
-            var fileA = request.SubmissionA.Files.FirstOrDefault();
-            var fileB = request.SubmissionB.Files.FirstOrDefault();
+            var algoParams = request.AnalysisConfig?.Parameters?
+                .ToDictionary(k => k.Key, v => (object)v.Value);
 
-            if (fileA != null && fileB != null)
+            foreach (var fileA in request.SubmissionA.Files)
             {
-                foreach (var algo in _algorithms)
+                var fileNode = new NodeDto
                 {
-                    if (requestedMethods.Any() && !requestedMethods.Contains(algo.Key))
-                        continue;
+                    Name = fileA.Filename,
+                    Path = fileA.Filename,
+                    Type = "file",
+                    ReferenceScores = new Dictionary<string, int>(),
+                    DetailedMatches = new Dictionary<string, List<DetailedMatch>>()
+                };
 
-                    var matches = algo.Execute(
-                        fileA.Content,
-                        fileB.Content,
-                        request.AnalysisConfig?.Parameters,
-                        out double score
-                    );
+                double fileBestScore = 0;
 
-                    allMatches.AddRange(matches);
-                    if (score > maxScore)
-                        maxScore = score;
+                foreach (var fileB in request.SubmissionB.Files)
+                {
+                    var pairMatches = new List<DetailedMatch>();
+                    double pairBestScore = 0;
+
+                    foreach (var algo in _algorithms)
+                    {
+                        if (requestedMethods.Any() && !requestedMethods.Contains(algo.Key))
+                            continue;
+
+                        var matches = algo.Execute(
+                            fileA.Content,
+                            fileB.Content,
+                            algoParams,
+                            out double score
+                        );
+
+                        pairMatches.AddRange(matches);
+                        pairBestScore = Math.Max(pairBestScore, score);
+                    }
+
+                    fileNode.DetailedMatches[fileB.Filename] = pairMatches;
+                    fileNode.ReferenceScores[fileB.Filename] = (int)pairBestScore;
+                    fileBestScore = Math.Max(fileBestScore, pairBestScore);
                 }
+
+                fileNode.Score = (int)fileBestScore;
+                globalMaxScore = Math.Max(globalMaxScore, fileBestScore);
+                submissionNodes.Add(fileNode);
             }
 
-            return new AnalysisResponseDto
+            return new AnalysisResponse
             {
                 Info = new AnalysisInfo
                 {
-                    OverallScore = (int)maxScore,
-                    Mode = "Graph-Based Analysis",
+                    OverallScore = (int)globalMaxScore,
+                    Mode = "Graph-Based (CFG/PDG) Analysis",
                     Date = DateTime.Now.ToString("dd.MM.yyyy"),
                 },
-                SubmissionTree = new List<NodeDto>
+                SubmissionTree = submissionNodes,
+                ReferenceTree = request.SubmissionB.Files.Select(f => new NodeDto
                 {
-                    new NodeDto
-                    {
-                        Name = fileA?.Filename ?? "unknown",
-                        Type = "file",
-                        Score = (int)maxScore,
-                        DetailedMatches = new Dictionary<string, List<DetailedMatch>>
-                        {
-                            { fileB?.Filename ?? "unknown", allMatches },
-                        },
-                    },
-                },
-                ReferenceTree = new List<NodeDto>(),
+                    Name = f.Filename,
+                    Type = "file",
+                    Path = f.Filename
+                }).ToList(),
             };
         }
     }

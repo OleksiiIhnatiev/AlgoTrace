@@ -1,13 +1,12 @@
 ﻿using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO;
 using AlgoTrace.Server.Utils;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 
 namespace AlgoTrace.Server.Algorithms.Textual
 {
     public class RabinKarpAlgorithm : ITextAlgorithm
     {
+        public string Key => "rabin_karp";
         public string Name => "Rabin-Karp Block Search";
 
         public List<DetailedMatch> Execute(string source, string target, out double similarityScore)
@@ -17,6 +16,7 @@ namespace AlgoTrace.Server.Algorithms.Textual
             var matches = new List<DetailedMatch>();
             int blockSize = 5;
             int matchedLinesCount = 0;
+            int matchCounter = 0;
 
             for (int i = 0; i <= sLines.Length - blockSize; i++)
             {
@@ -24,6 +24,7 @@ namespace AlgoTrace.Server.Algorithms.Textual
                     "\n",
                     sLines.Skip(i).Take(blockSize).Select(SourceNormalizer.NormalizeLine)
                 );
+
                 if (block.Length < 50)
                     continue;
 
@@ -39,13 +40,14 @@ namespace AlgoTrace.Server.Algorithms.Textual
                         matches.Add(
                             new DetailedMatch
                             {
-                                Id = new Random().Next(100, 999),
+                                Id = 4000 + matchCounter++,
                                 Type = "Exact Block Match",
                                 LeftLines = new List<int> { i + 1, i + blockSize },
                                 RightLines = new List<int> { j + 1, j + blockSize },
                                 Severity = "high",
                             }
                         );
+
                         matchedLinesCount += blockSize;
                         i += blockSize - 1;
                         break;
@@ -53,8 +55,7 @@ namespace AlgoTrace.Server.Algorithms.Textual
                 }
             }
 
-            similarityScore =
-                (double)matchedLinesCount / Math.Max(sLines.Length, tLines.Length) * 100;
+            similarityScore = Math.Min(100, (double)matchedLinesCount / Math.Max(sLines.Length, tLines.Length) * 100);
             return matches;
         }
     }

@@ -1,10 +1,11 @@
 using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO;
 
-namespace AlgoTrace.Server.Algorithms
+namespace AlgoTrace.Server.Algorithms.Token
 {
     public class WinnowingAlgorithm : ITokenAlgorithm
     {
+        public string Key => "winnowing";
         public string Name => "Winnowing (Fingerprinting)";
         private const int K = 5;
 
@@ -14,6 +15,12 @@ namespace AlgoTrace.Server.Algorithms
             out double similarityScore
         )
         {
+            if (sourceTokens == null || sourceTokens.Count < K || targetTokens == null || targetTokens.Count < K)
+            {
+                similarityScore = 0;
+                return new List<DetailedMatch>();
+            }
+
             var sHashes = GetFingerprints(sourceTokens);
             var tHashes = GetFingerprints(targetTokens);
 
@@ -27,8 +34,8 @@ namespace AlgoTrace.Server.Algorithms
                 .Select(h => h.Hash)
                 .Intersect(tHashes.Select(h => h.Hash))
                 .ToHashSet();
-            similarityScore =
-                (double)commonHashes.Count / Math.Max(sHashes.Count, tHashes.Count) * 100;
+
+            similarityScore = (double)commonHashes.Count / Math.Max(sHashes.Count, tHashes.Count) * 100;
 
             var matches = new List<DetailedMatch>();
             if (commonHashes.Any())
@@ -36,24 +43,22 @@ namespace AlgoTrace.Server.Algorithms
                 var matchedSource = sHashes.Where(h => commonHashes.Contains(h.Hash)).ToList();
                 var matchedTarget = tHashes.Where(h => commonHashes.Contains(h.Hash)).ToList();
 
-                matches.Add(
-                    new DetailedMatch
+                matches.Add(new DetailedMatch
+                {
+                    Id = 5002,
+                    Type = "Token Sequence Match",
+                    Severity = similarityScore > 70 ? "high" : "med",
+                    LeftLines = new List<int>
                     {
-                        Id = 201,
-                        Type = "Token Sequence Match",
-                        Severity = similarityScore > 70 ? "high" : "med",
-                        LeftLines = new List<int>
-                        {
-                            matchedSource.First().StartLine,
-                            matchedSource.Last().EndLine,
-                        },
-                        RightLines = new List<int>
-                        {
-                            matchedTarget.First().StartLine,
-                            matchedTarget.Last().EndLine,
-                        },
+                        matchedSource.First().StartLine,
+                        matchedSource.Last().EndLine,
+                    },
+                    RightLines = new List<int>
+                    {
+                        matchedTarget.First().StartLine,
+                        matchedTarget.Last().EndLine,
                     }
-                );
+                });
             }
             return matches;
         }
@@ -67,9 +72,11 @@ namespace AlgoTrace.Server.Algorithms
             {
                 var window = tokens.Skip(i).Take(K).ToList();
                 var gram = string.Join("", window.Select(t => t.Value));
-                result.Add(
-                    new Fingerprint(gram.GetHashCode(), window.First().Line, window.Last().Line)
-                );
+                result.Add(new Fingerprint(
+                    gram.GetHashCode(),
+                    window.First().Line,
+                    window.Last().Line
+                ));
             }
             return result;
         }

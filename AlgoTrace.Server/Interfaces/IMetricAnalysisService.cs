@@ -4,6 +4,6 @@ namespace AlgoTrace.Server.Interfaces
 {
     public interface IMetricAnalysisService
     {
-        AnalysisResponseDto Analyze(MetricAnalysisRequest request);
+        AnalysisResponse Analyze(AnalysisRequest request);
     }
 }
