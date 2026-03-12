@@ -18,8 +18,10 @@ namespace AlgoTrace.Server.Services
             double globalMaxScore = 0;
             var requestedMethods = request.AnalysisConfig?.Methods ?? new List<string>();
 
-            var algoParams = request.AnalysisConfig?.Parameters?
-                .ToDictionary(k => k.Key, v => (object)v.Value);
+            var algoParams = request.AnalysisConfig?.Parameters?.ToDictionary(
+                k => k.Key,
+                v => (object)v.Value
+            );
 
             foreach (var fileA in request.SubmissionA.Files)
             {
@@ -29,7 +31,7 @@ namespace AlgoTrace.Server.Services
                     Path = fileA.Filename,
                     Type = "file",
                     ReferenceScores = new Dictionary<string, int>(),
-                    DetailedMatches = new Dictionary<string, List<DetailedMatch>>()
+                    DetailedMatches = new Dictionary<string, List<DetailedMatch>>(),
                 };
 
                 double fileBestScore = 0;
@@ -74,12 +76,14 @@ namespace AlgoTrace.Server.Services
                     Date = DateTime.Now.ToString("dd.MM.yyyy"),
                 },
                 SubmissionTree = submissionNodes,
-                ReferenceTree = request.SubmissionB.Files.Select(f => new NodeDto
-                {
-                    Name = f.Filename,
-                    Type = "file",
-                    Path = f.Filename
-                }).ToList(),
+                ReferenceTree = request
+                    .SubmissionB.Files.Select(f => new NodeDto
+                    {
+                        Name = f.Filename,
+                        Type = "file",
+                        Path = f.Filename,
+                    })
+                    .ToList(),
             };
         }
     }

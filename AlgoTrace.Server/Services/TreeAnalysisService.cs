@@ -1,64 +1,24 @@
+using AlgoTrace.Server.Algorithms.Tree;
 using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO;
+using AlgoTrace.Server.ParserFactory;
 
 namespace AlgoTrace.Server.Services
 {
     public class TreeAnalysisService : ITreeAnalysisService
     {
-        private readonly IEnumerable<ICodeParser> _parsers;
         private readonly IEnumerable<ITreeAlgorithm> _algorithms;
+        private readonly IEnumerable<ICodeParser> _parsers;
 
-        public TreeAnalysisService(IEnumerable<ICodeParser> parsers, IEnumerable<ITreeAlgorithm> algorithms)
+        public TreeAnalysisService(IEnumerable<ITreeAlgorithm> algorithms, IEnumerable<ICodeParser> parsers)
         {
-            _parsers = parsers;
             _algorithms = algorithms;
+            _parsers = parsers;
         }
 
         public AnalysisResponse Analyze(AnalysisRequest request)
         {
-            var parser = _parsers.FirstOrDefault(p => p.Language.Equals(request.Language, StringComparison.OrdinalIgnoreCase))
-                         ?? throw new Exception($"Language {request.Language} not supported");
-
-            var submissionNodes = new List<NodeDto>();
-            double globalMaxScore = 0;
-
-            foreach (var fileA in request.SubmissionA.Files)
-            {
-                var treeA = parser.Parse(fileA.Content);
-                var node = new NodeDto { Name = fileA.Filename, Path = fileA.Filename, Type = "file" };
-                double fileBestScore = 0;
-
-                foreach (var fileB in request.SubmissionB.Files)
-                {
-                    var treeB = parser.Parse(fileB.Content);
-                    var pairMatches = new List<DetailedMatch>();
-                    double pairBestScore = 0;
-
-                    foreach (var algo in _algorithms)
-                    {
-                        if (request.AnalysisConfig.Methods.Contains(algo.Key))
-                        {
-                            double score = algo.Calculate(treeA, treeB, out var m);
-                            pairMatches.AddRange(m);
-                            pairBestScore = Math.Max(pairBestScore, score);
-                        }
-                    }
-
-                    node.ReferenceScores[fileB.Filename] = (int)pairBestScore;
-                    node.DetailedMatches[fileB.Filename] = pairMatches;
-                    fileBestScore = Math.Max(fileBestScore, pairBestScore);
-                }
-
-                node.Score = (int)fileBestScore;
-                globalMaxScore = Math.Max(globalMaxScore, fileBestScore);
-                submissionNodes.Add(node);
-            }
-
-            return new AnalysisResponse
-            {
-                Info = new AnalysisInfo { OverallScore = (int)globalMaxScore, Mode = "AST Tree-based", Date = DateTime.Now.ToString("dd.MM.yyyy") },
-                SubmissionTree = submissionNodes
-            };
+            return new AnalysisResponse();
         }
     }
 }

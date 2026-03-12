@@ -1,7 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import HomeView from '../components/HomeView.vue';
-import AuthView from '../components/AuthView.vue';
-import AnalyzerPage from '../components/AnalyzerPage.vue';
+import { authState, authService } from '../services/auth.service';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -9,19 +7,28 @@ const router = createRouter({
     {
       path: '/',
       name: 'home',
-      component: HomeView
+      component: () => import('../components/HomeView.vue')
     },
     {
       path: '/auth',
       name: 'auth',
-      component: AuthView
-    },
-    {
-      path: '/analyzer',
-      name: 'analyzer',
-      component: AnalyzerPage 
+      component: () => import('../components/AuthView.vue')
     }
   ]
+});
+
+// Глобальный Guard для защиты роутов
+router.beforeEach(async (to, from, next) => {
+  // Если данные еще грузятся (например, при F5), ждем инициализации
+  if (authState.loading) {
+    await authService.init();
+  }
+
+  if (to.meta.requiresAuth && !authState.isAuthenticated) {
+    next('/auth');
+  } else {
+    next();
+  }
 });
 
 export default router;

@@ -18,7 +18,8 @@ namespace AlgoTrace.Server.Algorithms.Textual
             for (int i = 0; i < sLines.Length; i++)
             {
                 string sNorm = SourceNormalizer.NormalizeLine(sLines[i]);
-                if (sNorm.Length < 8) continue;
+                if (sNorm.Length < 8)
+                    continue;
 
                 for (int j = 0; j < tLines.Length; j++)
                 {
@@ -52,14 +53,16 @@ namespace AlgoTrace.Server.Algorithms.Textual
                 }
                 else
                 {
-                    merged.Add(new DetailedMatch
-                    {
-                        Id = 1000 + matchCounter++,
-                        Type = "Code Block Clone",
-                        LeftLines = new List<int> { startS, lastS },
-                        RightLines = new List<int> { startT, lastT },
-                        Severity = (lastS - startS) > 3 ? "high" : "med"
-                    });
+                    merged.Add(
+                        new DetailedMatch
+                        {
+                            Id = 1000 + matchCounter++,
+                            Type = "Code Block Clone",
+                            LeftLines = new List<int> { startS, lastS },
+                            RightLines = new List<int> { startT, lastT },
+                            Severity = (lastS - startS) > 3 ? "high" : "med",
+                        }
+                    );
                     startS = rawMatches[i].sIdx;
                     startT = rawMatches[i].tIdx;
                     lastS = startS;
@@ -67,16 +70,19 @@ namespace AlgoTrace.Server.Algorithms.Textual
                 }
             }
 
-            merged.Add(new DetailedMatch
-            {
-                Id = 1000 + matchCounter,
-                Type = "Code Block Clone",
-                LeftLines = new List<int> { startS, lastS },
-                RightLines = new List<int> { startT, lastT },
-                Severity = (lastS - startS) > 3 ? "high" : "med"
-            });
+            merged.Add(
+                new DetailedMatch
+                {
+                    Id = 1000 + matchCounter,
+                    Type = "Code Block Clone",
+                    LeftLines = new List<int> { startS, lastS },
+                    RightLines = new List<int> { startT, lastT },
+                    Severity = (lastS - startS) > 3 ? "high" : "med",
+                }
+            );
 
-            similarityScore = (double)rawMatches.Count / Math.Max(sLines.Length, tLines.Length) * 100;
+            similarityScore =
+                (double)rawMatches.Count / Math.Max(sLines.Length, tLines.Length) * 100;
             return merged;
         }
     }

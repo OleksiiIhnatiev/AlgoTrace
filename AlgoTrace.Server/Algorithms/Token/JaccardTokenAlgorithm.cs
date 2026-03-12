@@ -14,7 +14,12 @@ namespace AlgoTrace.Server.Algorithms.Token
             out double similarityScore
         )
         {
-            if (sourceTokens == null || !sourceTokens.Any() || targetTokens == null || !targetTokens.Any())
+            if (
+                sourceTokens == null
+                || !sourceTokens.Any()
+                || targetTokens == null
+                || !targetTokens.Any()
+            )
             {
                 similarityScore = 0;
                 return new List<DetailedMatch>();

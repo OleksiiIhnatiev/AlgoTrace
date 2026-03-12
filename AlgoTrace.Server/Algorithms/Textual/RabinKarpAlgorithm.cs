@@ -55,7 +55,10 @@ namespace AlgoTrace.Server.Algorithms.Textual
                 }
             }
 
-            similarityScore = Math.Min(100, (double)matchedLinesCount / Math.Max(sLines.Length, tLines.Length) * 100);
+            similarityScore = Math.Min(
+                100,
+                (double)matchedLinesCount / Math.Max(sLines.Length, tLines.Length) * 100
+            );
             return matches;
         }
     }

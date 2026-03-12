@@ -13,7 +13,9 @@ namespace AlgoTrace.Server.ParserFactory
 
         public ICodeParser GetParser(string language)
         {
-            var parser = _parsers.FirstOrDefault(p => p.Language.Equals(language, StringComparison.OrdinalIgnoreCase));
+            var parser = _parsers.FirstOrDefault(p =>
+                p.Language.Equals(language, StringComparison.OrdinalIgnoreCase)
+            );
             if (parser == null)
                 throw new NotSupportedException($"Language {language} is not supported yet.");
             return parser;

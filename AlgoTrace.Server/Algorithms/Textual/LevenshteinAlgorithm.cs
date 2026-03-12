@@ -30,14 +30,16 @@ namespace AlgoTrace.Server.Algorithms.Textual
 
                     if (ratio > 0.85)
                     {
-                        matches.Add(new DetailedMatch
-                        {
-                            Id = i + 2000,
-                            Type = "Fuzzy Line Match",
-                            LeftLines = new List<int> { i + 1, i + 1 },
-                            RightLines = new List<int> { j + 1, j + 1 },
-                            Severity = "med"
-                        });
+                        matches.Add(
+                            new DetailedMatch
+                            {
+                                Id = i + 2000,
+                                Type = "Fuzzy Line Match",
+                                LeftLines = new List<int> { i + 1, i + 1 },
+                                RightLines = new List<int> { j + 1, j + 1 },
+                                Severity = "med",
+                            }
+                        );
                         matchCount++;
                         break;
                     }
@@ -49,7 +51,8 @@ namespace AlgoTrace.Server.Algorithms.Textual
 
         private int ComputeDistance(string s, string t)
         {
-            int n = s.Length, m = t.Length;
+            int n = s.Length,
+                m = t.Length;
             int[,] d = new int[n + 1, m + 1];
             for (int i = 0; i <= n; d[i, 0] = i++) { }
             for (int j = 0; j <= m; d[0, j] = j++) { }

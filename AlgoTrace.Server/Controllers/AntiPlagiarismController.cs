@@ -13,13 +13,15 @@ namespace AlgoTrace.Server.Controllers
         private readonly ITreeAnalysisService _treeService;
         private readonly IGraphAnalysisService _graphService;
         private readonly IMetricAnalysisService _metricService;
+        private readonly IUnifiedAnalysisService _unifiedService;
 
         public AnalysisController(
             ITextAnalysisService textService,
             ITokenAnalysisService tokenService,
             ITreeAnalysisService treeService,
             IGraphAnalysisService graphService,
-            IMetricAnalysisService metricService
+            IMetricAnalysisService metricService,
+            IUnifiedAnalysisService unifiedService
         )
         {
             _textService = textService;
@@ -27,6 +29,14 @@ namespace AlgoTrace.Server.Controllers
             _treeService = treeService;
             _graphService = graphService;
             _metricService = metricService;
+            _unifiedService = unifiedService;
+        }
+
+        [HttpPost("unified")]
+        public IActionResult CompareUnified([FromBody] UnifiedAnalysisRequest request)
+        {
+            var result = _unifiedService.Analyze(request);
+            return Ok(result);
         }
 
         [HttpPost("text/compare")]

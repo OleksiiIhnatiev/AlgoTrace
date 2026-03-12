@@ -1,129 +1,98 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { authService } from '@/services/auth.service';
+import { ref, reactive } from 'vue';
 import { useRouter } from 'vue-router';
 
 const router = useRouter();
 const isLogin = ref(true);
+const loading = ref(false);
+const error = ref('');
 
-const form = ref({
+const form = reactive({
   email: '',
-  password: '',
-  confirmPassword: ''
+  password: ''
 });
 
 const toggleMode = () => {
   isLogin.value = !isLogin.value;
-  form.value = { email: '', password: '', confirmPassword: '' };
+  error.value = '';
+  form.email = '';
+  form.password = '';
 };
 
-const goBack = () => {
-  router.push('/');
-};
+const handleSubmit = async () => {
+  loading.value = true;
+  error.value = '';
 
-const handleSubmit = () => {
-  router.push('/');
+  try {
+    if (isLogin.value) {
+      await authService.login({
+        email: form.email,
+        password: form.password
+      });
+      router.push('/');
+    } else {
+      await authService.register({
+        email: form.email,
+        password: form.password
+      });
+      // Auto-login after successful registration
+      await authService.login({
+        email: form.email,
+        password: form.password
+      });
+      router.push('/');
+    }
+  } catch (err: unknown) {
+    console.error(err);
+    error.value = isLogin.value
+      ? 'Невірний логін або пароль.'
+      : 'Помилка реєстрації. Можливо, такий користувач вже існує.';
+  } finally {
+    loading.value = false;
+  }
 };
 </script>
 
 <template>
   <div class="min-vh-100 d-flex align-items-center justify-content-center bg-light">
-    <div class="container">
-      <div class="row justify-content-center">
-        <div class="col-md-6 col-lg-5 col-xl-4">
-
-          <div class="text-center mb-4">
-            <div class="d-inline-flex align-items-center justify-content-center">
-              <div class="bg-primary bg-gradient text-white rounded-3 p-2 me-2 d-flex align-items-center justify-content-center shadow-sm" style="width: 42px; height: 42px;">
-                <i class="bi bi-layers-half fs-4"></i>
-              </div>
-              <div class="d-flex flex-column align-items-start lh-1">
-                <span class="fw-bolder text-dark fs-4" style="letter-spacing: -0.5px;">AlgoTrace</span>
-                <span class="text-primary fw-bold" style="font-size: 10px; letter-spacing: 2px;">PRO ANALYZER</span>
-              </div>
-            </div>
+    <div class="card border-0 shadow-lg rounded-4 overflow-hidden" style="max-width: 400px; width: 100%;">
+      <div class="card-body p-5">
+        <div class="text-center mb-4">
+          <div class="bg-primary bg-gradient text-white rounded-3 p-2 d-inline-flex align-items-center justify-content-center shadow-sm mb-3" style="width: 50px; height: 50px;">
+            <i class="bi bi-layers-half fs-3"></i>
           </div>
-
-          <div class="card border-0 shadow-sm rounded-4">
-            <div class="card-body p-4 p-sm-5">
-
-              <div class="text-center mb-4">
-                <h4 class="fw-bold text-dark mb-1">
-                  {{ isLogin ? 'Вхід до системи' : 'Реєстрація' }}
-                </h4>
-                <p class="text-muted small">
-                  {{ isLogin ? 'Продовжіть роботу з аналізатором' : 'Створіть новий профіль' }}
-                </p>
-              </div>
-
-              <form @submit.prevent="handleSubmit">
-                <div class="form-floating mb-3">
-                  <input
-                    type="email"
-                    class="form-control rounded-3"
-                    id="email"
-                    v-model="form.email"
-                    required
-                    placeholder="name@example.com"
-                  />
-                  <label for="email" class="text-muted">
-                    <i class="bi bi-envelope me-2"></i> Email
-                  </label>
-                </div>
-
-                <div class="form-floating mb-3">
-                  <input
-                    type="password"
-                    class="form-control rounded-3"
-                    id="password"
-                    v-model="form.password"
-                    required
-                    placeholder="Password"
-                  />
-                  <label for="password" class="text-muted">
-                    <i class="bi bi-lock me-2"></i> Пароль
-                  </label>
-                </div>
-
-                <div class="form-floating mb-3" v-if="!isLogin">
-                  <input
-                    type="password"
-                    class="form-control rounded-3"
-                    id="confirmPassword"
-                    v-model="form.confirmPassword"
-                    required
-                    placeholder="Confirm Password"
-                  />
-                  <label for="confirmPassword" class="text-muted">
-                    <i class="bi bi-shield-lock me-2"></i> Підтвердження
-                  </label>
-                </div>
-
-                <div class="d-grid gap-2 mt-4">
-                  <button type="submit" class="btn btn-primary btn-lg rounded-3 fw-bold shadow-sm">
-                    {{ isLogin ? 'Увійти' : 'Зареєструватися' }}
-                  </button>
-                </div>
-              </form>
-
-              <div class="text-center mt-4">
-                <span class="text-muted small">
-                  {{ isLogin ? 'Немає акаунту?' : 'Вже є акаунт?' }}
-                </span>
-                <button class="btn btn-link text-decoration-none fw-bold p-0 ms-1 align-baseline" @click="toggleMode">
-                  {{ isLogin ? 'Зареєструватися' : 'Увійти' }}
-                </button>
-              </div>
-
-              <hr class="my-4 text-muted opacity-10" />
-
-              <div class="text-center">
-                <button class="btn btn-sm btn-link text-secondary text-decoration-none" @click="goBack">
-                  <i class="bi bi-arrow-left me-1"></i> На головну
-                </button>
-              </div>
-            </div>
-          </div>
+          <h4 class="fw-bold text-dark">{{ isLogin ? 'З поверненням!' : 'Створити акаунт' }}</h4>
+          <p class="text-muted small">Введіть свої дані для продовження</p>
         </div>
+
+        <form @submit.prevent="handleSubmit">
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-secondary">Email</label>
+            <input v-model="form.email" type="email" class="form-control rounded-3 py-2" placeholder="name@example.com" required />
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label small fw-bold text-secondary">Пароль</label>
+            <input v-model="form.password" type="password" class="form-control rounded-3 py-2" placeholder="••••••••" required />
+          </div>
+
+          <div v-if="error" class="alert alert-danger py-2 small rounded-3 mb-3">
+            <i class="bi bi-exclamation-circle-fill me-1"></i> {{ error }}
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100 rounded-pill fw-bold py-2 mb-4 shadow-sm" :disabled="loading">
+            <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
+            {{ isLogin ? 'Увійти' : 'Зареєструватися' }}
+          </button>
+
+          <div class="text-center small">
+            <span class="text-muted">{{ isLogin ? 'Немає акаунту?' : 'Вже є акаунт?' }}</span>
+            <a href="#" class="text-primary fw-bold text-decoration-none ms-1" @click.prevent="toggleMode">
+              {{ isLogin ? 'Зареєструватися' : 'Увійти' }}
+            </a>
+          </div>
+        </form>
       </div>
     </div>
   </div>

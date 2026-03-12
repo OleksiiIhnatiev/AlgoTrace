@@ -15,7 +15,12 @@ namespace AlgoTrace.Server.Algorithms.Token
             out double similarityScore
         )
         {
-            if (sourceTokens == null || sourceTokens.Count < K || targetTokens == null || targetTokens.Count < K)
+            if (
+                sourceTokens == null
+                || sourceTokens.Count < K
+                || targetTokens == null
+                || targetTokens.Count < K
+            )
             {
                 similarityScore = 0;
                 return new List<DetailedMatch>();
@@ -35,7 +40,8 @@ namespace AlgoTrace.Server.Algorithms.Token
                 .Intersect(tHashes.Select(h => h.Hash))
                 .ToHashSet();
 
-            similarityScore = (double)commonHashes.Count / Math.Max(sHashes.Count, tHashes.Count) * 100;
+            similarityScore =
+                (double)commonHashes.Count / Math.Max(sHashes.Count, tHashes.Count) * 100;
 
             var matches = new List<DetailedMatch>();
             if (commonHashes.Any())
@@ -43,22 +49,24 @@ namespace AlgoTrace.Server.Algorithms.Token
                 var matchedSource = sHashes.Where(h => commonHashes.Contains(h.Hash)).ToList();
                 var matchedTarget = tHashes.Where(h => commonHashes.Contains(h.Hash)).ToList();
 
-                matches.Add(new DetailedMatch
-                {
-                    Id = 5002,
-                    Type = "Token Sequence Match",
-                    Severity = similarityScore > 70 ? "high" : "med",
-                    LeftLines = new List<int>
+                matches.Add(
+                    new DetailedMatch
                     {
-                        matchedSource.First().StartLine,
-                        matchedSource.Last().EndLine,
-                    },
-                    RightLines = new List<int>
-                    {
-                        matchedTarget.First().StartLine,
-                        matchedTarget.Last().EndLine,
+                        Id = 5002,
+                        Type = "Token Sequence Match",
+                        Severity = similarityScore > 70 ? "high" : "med",
+                        LeftLines = new List<int>
+                        {
+                            matchedSource.First().StartLine,
+                            matchedSource.Last().EndLine,
+                        },
+                        RightLines = new List<int>
+                        {
+                            matchedTarget.First().StartLine,
+                            matchedTarget.Last().EndLine,
+                        },
                     }
-                });
+                );
             }
             return matches;
         }
@@ -72,11 +80,9 @@ namespace AlgoTrace.Server.Algorithms.Token
             {
                 var window = tokens.Skip(i).Take(K).ToList();
                 var gram = string.Join("", window.Select(t => t.Value));
-                result.Add(new Fingerprint(
-                    gram.GetHashCode(),
-                    window.First().Line,
-                    window.Last().Line
-                ));
+                result.Add(
+                    new Fingerprint(gram.GetHashCode(), window.First().Line, window.Last().Line)
+                );
             }
             return result;
         }

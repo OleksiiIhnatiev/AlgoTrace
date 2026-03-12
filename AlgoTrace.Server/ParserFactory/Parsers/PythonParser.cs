@@ -1,6 +1,6 @@
-﻿using AlgoTrace.Server.Interfaces;
+﻿using System.Text.RegularExpressions;
+using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.ParserFactory;
-using System.Text.RegularExpressions;
 
 public class PythonParser : ICodeParser
 {
@@ -13,10 +13,13 @@ public class PythonParser : ICodeParser
 
         foreach (var line in lines)
         {
-            if (string.IsNullOrWhiteSpace(line)) continue;
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
 
             if (line.Trim().StartsWith("def "))
-                root.Children.Add(new UniversalNode { Type = "FunctionDefinition", Value = line.Trim() });
+                root.Children.Add(
+                    new UniversalNode { Type = "FunctionDefinition", Value = line.Trim() }
+                );
             else if (line.Trim().StartsWith("if "))
                 root.Children.Add(new UniversalNode { Type = "IfStatement" });
             else if (line.Trim().StartsWith("while ") || line.Trim().StartsWith("for "))

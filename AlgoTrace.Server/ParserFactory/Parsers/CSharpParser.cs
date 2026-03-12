@@ -21,7 +21,7 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
             {
                 Type = node.Kind().ToString(),
                 Value = GetNodeValue(node),
-                Children = node.ChildNodes().Select(MapToUniversal).ToList()
+                Children = node.ChildNodes().Select(MapToUniversal).ToList(),
             };
         }
 

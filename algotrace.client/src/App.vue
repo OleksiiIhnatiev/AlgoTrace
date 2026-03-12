@@ -1,5 +1,11 @@
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import { RouterView } from 'vue-router';
+import { authService } from './services/auth.service';
+
+onMounted(() => {
+  authService.init();
+});
 </script>
 
 <template>

@@ -7,12 +7,14 @@ namespace AlgoTrace.Server.Algorithms.Tree
     public class AstHashingAlgorithm : ITreeAlgorithm
     {
         public string Key => "ast_hashing";
-        public double Calculate(UniversalNode treeA, UniversalNode treeB, out List<DetailedMatch> matches)
+
+        public double Calculate(UniversalNode treeA, UniversalNode treeB, out object outMatches)
         {
             var hashA = GetTreeHash(treeA);
             var hashB = GetTreeHash(treeB);
+            var matches = new List<DetailedMatch>();
+            outMatches = matches;
 
-            matches = new List<DetailedMatch>();
             if (hashA == hashB)
             {
                 matches.Add(new DetailedMatch { Type = "Full Structure Match", Severity = "high" });
@@ -20,6 +22,7 @@ namespace AlgoTrace.Server.Algorithms.Tree
             }
             return 0;
         }
+
         private int GetTreeHash(UniversalNode node) =>
             HashCode.Combine(node.Type, node.Children.Sum(c => GetTreeHash(c)));
     }

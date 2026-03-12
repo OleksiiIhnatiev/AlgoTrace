@@ -18,24 +18,33 @@ namespace AlgoTrace.Server.Algorithms.Textual
 
             for (int i = 0; i <= sLines.Length - 4; i++)
             {
-                var sBlock = string.Join("", sLines.Skip(i).Take(4).Select(SourceNormalizer.NormalizeLine));
-                if (sBlock.Length < 20) continue;
+                var sBlock = string.Join(
+                    "",
+                    sLines.Skip(i).Take(4).Select(SourceNormalizer.NormalizeLine)
+                );
+                if (sBlock.Length < 20)
+                    continue;
 
                 for (int j = 0; j <= tLines.Length - 4; j++)
                 {
-                    var tBlock = string.Join("", tLines.Skip(j).Take(4).Select(SourceNormalizer.NormalizeLine));
+                    var tBlock = string.Join(
+                        "",
+                        tLines.Skip(j).Take(4).Select(SourceNormalizer.NormalizeLine)
+                    );
                     double score = CalculateJaccard(sBlock, tBlock);
 
                     if (score > 0.7)
                     {
-                        matches.Add(new DetailedMatch
-                        {
-                            Id = 3000 + matchCounter++,
-                            Type = "Structural Fragment Match",
-                            LeftLines = new List<int> { i + 1, i + 4 },
-                            RightLines = new List<int> { j + 1, j + 4 },
-                            Severity = "med"
-                        });
+                        matches.Add(
+                            new DetailedMatch
+                            {
+                                Id = 3000 + matchCounter++,
+                                Type = "Structural Fragment Match",
+                                LeftLines = new List<int> { i + 1, i + 4 },
+                                RightLines = new List<int> { j + 1, j + 4 },
+                                Severity = "med",
+                            }
+                        );
                     }
                 }
             }
@@ -48,7 +57,8 @@ namespace AlgoTrace.Server.Algorithms.Textual
         {
             var n1 = GetGrams(s1);
             var n2 = GetGrams(s2);
-            if (!n1.Any() || !n2.Any()) return 0;
+            if (!n1.Any() || !n2.Any())
+                return 0;
 
             return (double)n1.Intersect(n2).Count() / n1.Union(n2).Count();
         }

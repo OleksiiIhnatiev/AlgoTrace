@@ -8,21 +8,21 @@ namespace AlgoTrace.Server.Models.DTO
         public string Language { get; set; } = "unknown";
 
         [JsonPropertyName("submission")]
-        public SubmissionData Submission { get; set; }
+        public SubmissionData Submission { get; set; } = new();
     }
 
     public class SubmissionData
     {
         [JsonPropertyName("files")]
-        public List<CodeFile> Files { get; set; }
+        public List<CodeFile> Files { get; set; } = new();
     }
 
     public class CodeFile
     {
         [JsonPropertyName("filename")]
-        public string Filename { get; set; }
+        public string Filename { get; set; } = "";
 
         [JsonPropertyName("content")]
-        public string Content { get; set; }
+        public string Content { get; set; } = "";
     }
 }

@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AlgoTrace.Server.Models.DTO
@@ -25,9 +26,9 @@ namespace AlgoTrace.Server.Models.DTO
 
     public class AnalysisResponse
     {
-        public AnalysisInfo Info { get; set; }
-        public List<NodeDto> SubmissionTree { get; set; }
-        public List<NodeDto> ReferenceTree { get; set; }
+        public AnalysisInfo Info { get; set; } = new();
+        public List<NodeDto> SubmissionTree { get; set; } = new();
+        public List<NodeDto> ReferenceTree { get; set; } = new();
     }
 
     public class AnalysisInfo
@@ -49,4 +50,168 @@ namespace AlgoTrace.Server.Models.DTO
         public Dictionary<string, int>? ReferenceScores { get; set; }
         public Dictionary<string, List<DetailedMatch>>? DetailedMatches { get; set; }
     }
+
+    // ==========================================
+    // NEW UNIFIED MODELS
+    // ==========================================
+
+    public class UnifiedAnalysisRequest
+    {
+        [JsonPropertyName("language")]
+        public string Language { get; set; } = "python";
+
+        [JsonPropertyName("submission_a")]
+        public SubmissionData SubmissionA { get; set; } = new();
+
+        [JsonPropertyName("submission_b")]
+        public SubmissionData SubmissionB { get; set; } = new();
+
+        [JsonPropertyName("analysis_config")]
+        public UnifiedConfig AnalysisConfig { get; set; } = new();
+    }
+
+    public class UnifiedConfig
+    {
+        [JsonPropertyName("parameters")]
+        public Dictionary<string, object> Parameters { get; set; } = new();
+
+        [JsonPropertyName("execute_categories")]
+        public ExecuteCategories ExecuteCategories { get; set; } = new();
+    }
+
+    public class ExecuteCategories
+    {
+        [JsonPropertyName("text_based")]
+        public List<string> TextBased { get; set; } = new();
+
+        [JsonPropertyName("token_based")]
+        public List<string> TokenBased { get; set; } = new();
+
+        [JsonPropertyName("tree_based")]
+        public List<string> TreeBased { get; set; } = new();
+
+        [JsonPropertyName("graph_based")]
+        public List<string> GraphBased { get; set; } = new();
+
+        [JsonPropertyName("metrics_based")]
+        public List<string> MetricsBased { get; set; } = new();
+    }
+
+    public class UnifiedAnalysisResponse
+    {
+        [JsonPropertyName("analysis_id")]
+        public string AnalysisId { get; set; } = "";
+
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = "completed";
+
+        [JsonPropertyName("global_similarity_score")]
+        public double GlobalSimilarityScore { get; set; }
+
+        [JsonPropertyName("categories_results")]
+        public List<CategoryResult> CategoriesResults { get; set; } = new();
+    }
+
+    public class CategoryResult
+    {
+        [JsonPropertyName("category_name")]
+        public string CategoryName { get; set; } = "";
+
+        [JsonPropertyName("category_similarity_score")]
+        public double CategorySimilarityScore { get; set; }
+
+        [JsonPropertyName("algorithms")]
+        public List<AlgorithmResult> Algorithms { get; set; } = new();
+    }
+
+    public class AlgorithmResult
+    {
+        [JsonPropertyName("method")]
+        public string Method { get; set; } = "";
+
+        [JsonPropertyName("similarity_score")]
+        public double SimilarityScore { get; set; }
+
+        [JsonPropertyName("evidence_type")]
+        public string EvidenceType { get; set; } = "";
+
+        [JsonPropertyName("evidence")]
+        public object Evidence { get; set; } = new { };
+    }
+
+    // Specific Evidence Models
+    public class TextEvidence
+    {
+        [JsonPropertyName("matched_blocks")]
+        public List<object> MatchedBlocks { get; set; } = new();
+    }
+
+    public class TokenEvidence
+    {
+        [JsonPropertyName("matched_hashes")]
+        public List<object> MatchedHashes { get; set; } = new();
+    }
+
+    public class MetricEvidence
+    {
+        [JsonPropertyName("metrics_a")]
+        public Dictionary<string, double> MetricsA { get; set; } = new();
+
+        [JsonPropertyName("metrics_b")]
+        public Dictionary<string, double> MetricsB { get; set; } = new();
+
+        [JsonPropertyName("conclusion")]
+        public string Conclusion { get; set; } = "";
+    }
+
+    public class TreeEvidence
+    {
+        [JsonPropertyName("matched_subtrees")]
+        public List<MatchedSubtree> MatchedSubtrees { get; set; } = new();
+    }
+
+    public class MatchedSubtree
+    {
+        [JsonPropertyName("node_type")]
+        public string NodeType { get; set; } = "";
+
+        [JsonPropertyName("nodes_a")]
+        public List<MatchedNodeInfo> NodesA { get; set; } = new();
+
+        [JsonPropertyName("nodes_b")]
+        public List<MatchedNodeInfo> NodesB { get; set; } = new();
+    }
+
+    public class MatchedNodeInfo
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; } = "";
+
+        [JsonPropertyName("label")]
+        public string Label { get; set; } = "";
+
+        [JsonPropertyName("children")]
+        public List<string> Children { get; set; } = new();
+
+        [JsonPropertyName("location")]
+        public CodeLocation Location { get; set; } = new();
+    }
+
+    public class CodeLocation
+    {
+        [JsonPropertyName("start_line")]
+        public int StartLine { get; set; }
+
+        [JsonPropertyName("start_column")]
+        public int StartColumn { get; set; }
+
+        [JsonPropertyName("end_line")]
+        public int EndLine { get; set; }
+
+        [JsonPropertyName("end_column")]
+        public int EndColumn { get; set; }
+    }
+
+    // For graph/tree we can use generic objects or Dictionary<string,object>
+    // as the visualization structure can be complex.
 }

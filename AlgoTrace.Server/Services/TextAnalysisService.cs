@@ -26,7 +26,7 @@ namespace AlgoTrace.Server.Services
                     Path = fileA.Filename,
                     Type = "file",
                     ReferenceScores = new Dictionary<string, int>(),
-                    DetailedMatches = new Dictionary<string, List<DetailedMatch>>()
+                    DetailedMatches = new Dictionary<string, List<DetailedMatch>>(),
                 };
 
                 double fileBestScore = 0;
@@ -38,7 +38,10 @@ namespace AlgoTrace.Server.Services
 
                     foreach (var algo in _algorithms)
                     {
-                        if (requestedMethods.Any() && !requestedMethods.Contains(algo.Name.ToLower().Replace(" ", "_")))
+                        if (
+                            requestedMethods.Any()
+                            && !requestedMethods.Contains(algo.Name.ToLower().Replace(" ", "_"))
+                        )
                             continue;
 
                         var matches = algo.Execute(fileA.Content, fileB.Content, out double score);
@@ -73,12 +76,14 @@ namespace AlgoTrace.Server.Services
                     Date = DateTime.Now.ToString("dd.MM.yyyy"),
                 },
                 SubmissionTree = submissionNodes,
-                ReferenceTree = request.SubmissionB.Files.Select(f => new NodeDto
-                {
-                    Name = f.Filename,
-                    Path = f.Filename,
-                    Type = "file"
-                }).ToList()
+                ReferenceTree = request
+                    .SubmissionB.Files.Select(f => new NodeDto
+                    {
+                        Name = f.Filename,
+                        Path = f.Filename,
+                        Type = "file",
+                    })
+                    .ToList(),
             };
         }
 

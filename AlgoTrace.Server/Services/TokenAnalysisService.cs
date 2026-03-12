@@ -27,7 +27,7 @@ namespace AlgoTrace.Server.Services
                     Path = fileA.Filename,
                     Type = "file",
                     ReferenceScores = new Dictionary<string, int>(),
-                    DetailedMatches = new Dictionary<string, List<DetailedMatch>>()
+                    DetailedMatches = new Dictionary<string, List<DetailedMatch>>(),
                 };
 
                 var sourceTokens = Tokenize(fileA.Content);
@@ -76,12 +76,14 @@ namespace AlgoTrace.Server.Services
                     Date = DateTime.Now.ToString("dd.MM.yyyy"),
                 },
                 SubmissionTree = submissionNodes,
-                ReferenceTree = request.SubmissionB.Files.Select(f => new NodeDto
-                {
-                    Name = f.Filename,
-                    Path = f.Filename,
-                    Type = "file"
-                }).ToList()
+                ReferenceTree = request
+                    .SubmissionB.Files.Select(f => new NodeDto
+                    {
+                        Name = f.Filename,
+                        Path = f.Filename,
+                        Type = "file",
+                    })
+                    .ToList(),
             };
         }
 
@@ -93,11 +95,17 @@ namespace AlgoTrace.Server.Services
             string normalized = noComments;
             normalized = Regex.Replace(normalized, @"""[^""""]*""", " STR ");
             normalized = Regex.Replace(normalized, @"\b\d+\b", " NUM ");
-            normalized = Regex.Replace(normalized, @"\b(if|else|for|while|return|class|public|private|static|int|string|void|var)\b", " KEY ");
+            normalized = Regex.Replace(
+                normalized,
+                @"\b(if|else|for|while|return|class|public|private|static|int|string|void|var)\b",
+                " KEY "
+            );
             normalized = Regex.Replace(normalized, @"[a-zA-Z_][a-zA-Z0-9_]*", " ID ");
 
-            var words = normalized.Split(new[] { ' ', '\t', '\n', '\r', '{', '}', '(', ')', ';', ',' },
-                StringSplitOptions.RemoveEmptyEntries);
+            var words = normalized.Split(
+                new[] { ' ', '\t', '\n', '\r', '{', '}', '(', ')', ';', ',' },
+                StringSplitOptions.RemoveEmptyEntries
+            );
 
             foreach (var word in words)
             {
