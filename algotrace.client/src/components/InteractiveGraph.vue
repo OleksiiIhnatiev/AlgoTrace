@@ -19,7 +19,7 @@ const initGraph = () => {
   if (container.value && props.graphData?.nodes?.length) {
     if (network) network.destroy();
 
-    const defaultOptions = {
+    const defaultOptions: Options = {
       autoResize: true,
       nodes: {
         shape: 'box',
@@ -32,7 +32,7 @@ const initGraph = () => {
       edges: {
         arrows: 'to',
         color: { color: '#adb5bd', highlight: '#0d6efd' },
-        smooth: { type: 'cubicBezier' },
+        smooth: { enabled: true, type: 'cubicBezier', roundness: 0.5 },
         width: 2
       },
       physics: {

@@ -4,7 +4,8 @@ import { useRouter } from 'vue-router';
 import { analysisState } from '@/services/analysis.service';
 import type { editor } from 'monaco-editor';
 import InteractiveGraph from './InteractiveGraph.vue';
-import { VueMonacoEditor, type Monaco } from '@guolao/vue-monaco-editor';
+import { VueMonacoEditor } from '@guolao/vue-monaco-editor';
+import type * as monaco from 'monaco-editor';
 import { use } from 'echarts/core';
 import { RadarChart } from 'echarts/charts';
 import { TitleComponent, TooltipComponent, LegendComponent } from 'echarts/components';
@@ -74,13 +75,19 @@ interface CFGGraph {
   edges: CFGEdge[];
 }
 
-type Evidence =
-  | { matched_blocks: MatchedBlock[] }
-  | { matched_hashes: MatchedHash[] }
-  | ASTMatch[]
-  | { matched_subtrees: SubtreeMatch[] }
-  | { matches: GraphMatch[]; graph_a: CFGGraph; graph_b: CFGGraph }
-  | { metrics_a: Record<string, number>; metrics_b: Record<string, number>; conclusion?: string };
+interface Evidence {
+  matched_blocks?: MatchedBlock[];
+  matched_hashes?: MatchedHash[];
+  matched_subtrees?: SubtreeMatch[];
+  matches?: GraphMatch[];
+  graph_a?: CFGGraph;
+  graph_b?: CFGGraph;
+  metrics_a?: Record<string, number>;
+  metrics_b?: Record<string, number>;
+  conclusion?: string;
+  length?: number;
+  [index: number]: ASTMatch;
+}
 
 interface Algorithm {
   method: string;
@@ -121,9 +128,10 @@ onMounted(() => {
     router.push('/');
     return;
   }
-  const rep = analysisState.currentReport as Report;
+  const rep = analysisState.currentReport as unknown as Report;
   if (rep.categories_results && rep.categories_results.length > 0) {
-    selectCategory(rep.categories_results[0]);
+    const firstCat = rep.categories_results[0];
+    if (firstCat) selectCategory(firstCat);
   }
 });
 
@@ -161,7 +169,7 @@ const formatCategoryName = (name: string) => {
 const selectCategory = (cat: Category) => {
   activeCategory.value = cat.category_name;
   if (cat.algorithms && cat.algorithms.length > 0) {
-    activeAlgorithm.value = cat.algorithms[0];
+    activeAlgorithm.value = cat.algorithms[0] || null;
   } else {
     activeAlgorithm.value = null;
   }
@@ -172,10 +180,10 @@ const selectAlgorithm = (cat: Category, algo: Algorithm) => {
   activeAlgorithm.value = algo;
 };
 
-const aggregateMatches = (matches: (ASTMatch | GraphMatch)[]) => {
+const aggregateMatches = (matches: unknown) => {
   if (!matches || !Array.isArray(matches)) return [];
   const counts: Record<string, { type: string, severity: string, count: number }> = {};
-  matches.forEach((m) => {
+  (matches as (ASTMatch | GraphMatch)[]).forEach((m) => {
     const key = m.type + '_' + m.severity;
     if (!counts[key]) counts[key] = { type: m.type, severity: m.severity, count: 0 };
     counts[key].count++;
@@ -188,7 +196,7 @@ const getLinesContent = (code: string | undefined, lines: number[] | undefined, 
   const codeLines = code.split('\n');
   const result: string[] = [];
 
-  if (type === 'ast_tree_mapping' && lines.length === 2 && lines[0] !== lines[1]) {
+  if (type === 'ast_tree_mapping' && lines.length === 2 && lines[0] !== undefined && lines[1] !== undefined && lines[0] !== lines[1]) {
      for (let i = lines[0]; i <= lines[1]; i++) {
         if (codeLines[i - 1]) result.push(`${i}: ${codeLines[i - 1].trim()}`);
      }
@@ -204,28 +212,28 @@ const getLinesContent = (code: string | undefined, lines: number[] | undefined, 
 // --- ИНТЕГРАЦИЯ MONACO EDITOR ---
 const editorRefA = shallowRef();
 const editorRefB = shallowRef();
-let monacoInstance: Monaco | null = null;
+let monacoInstance: typeof monaco | null = null;
 let decorationsCollectionA: editor.IEditorDecorationsCollection | null = null;
 let decorationsCollectionB: editor.IEditorDecorationsCollection | null = null;
 
-const handleEditorMount = (editor: editor.IStandaloneCodeEditor, monaco: Monaco, fileId: 'a' | 'b') => {
+const handleEditorMount = (editor: editor.IStandaloneCodeEditor, m: typeof monaco, fileId: 'a' | 'b') => {
   if (fileId === 'a') editorRefA.value = editor;
   else editorRefB.value = editor;
-  monacoInstance = monaco;
+  monacoInstance = m;
   updateMonacoDecorations();
 };
 
 const getHighlightedLines = (fileId: 'a' | 'b', evidenceType: string, evidenceData: Evidence | undefined) => {
   const lines = new Set<number>();
   if (!evidenceData) return [];
-    if (evidenceType === 'text_highlight' && 'matched_blocks' in evidenceData) {
-      (evidenceData as { matched_blocks: MatchedBlock[] }).matched_blocks.forEach((match: MatchedBlock) => {
+    if (evidenceType === 'text_highlight' && evidenceData.matched_blocks) {
+      evidenceData.matched_blocks.forEach((match: MatchedBlock) => {
         const start = fileId === 'a' ? match.start_line_a : match.start_line_b;
         const end = fileId === 'a' ? match.end_line_a : match.end_line_b;
       for (let i = start; i <= end; i++) lines.add(i);
       });
-    } else if (evidenceType === 'graph_mapping' && 'matches' in evidenceData) {
-       (evidenceData as { matches: GraphMatch[] }).matches.forEach((match: GraphMatch) => {
+    } else if (evidenceType === 'graph_mapping' && evidenceData.matches) {
+       evidenceData.matches.forEach((match: GraphMatch) => {
          const matchLines = fileId === 'a' ? match.left_lines : match.right_lines;
        if (matchLines && Array.isArray(matchLines)) matchLines.forEach((l: number) => lines.add(l));
        });
@@ -233,7 +241,7 @@ const getHighlightedLines = (fileId: 'a' | 'b', evidenceType: string, evidenceDa
        (evidenceData as ASTMatch[]).forEach((match: ASTMatch) => {
          const matchLines = fileId === 'a' ? match.leftLines : match.rightLines;
          if (matchLines && Array.isArray(matchLines)) {
-           if (matchLines.length === 2 && matchLines[0] !== matchLines[1]) {
+           if (matchLines.length === 2 && matchLines[0] !== undefined && matchLines[1] !== undefined && matchLines[0] !== matchLines[1]) {
             for (let i = matchLines[0]; i <= matchLines[1]; i++) lines.add(i);
          } else {
             matchLines.forEach((l: number) => lines.add(l));
@@ -296,12 +304,14 @@ const buildCFGVisData = (graph: CFGGraph): { nodes: VisNode[], edges: VisEdge[] 
 
 // --- ИНТЕГРАЦИЯ ECHARTS ---
 const metricsChartOption = computed(() => {
-  if (activeAlgorithm.value?.evidence_type !== 'metric_comparison') return null;
+  if (activeAlgorithm.value?.evidence_type !== 'metric_comparison') return undefined;
   const ev = activeAlgorithm.value.evidence;
-  if (!('metrics_a' in ev) || !('metrics_b' in ev)) return null;
-  const keys = Object.keys(ev.metrics_a);
-  if (keys.length === 0) return null;
-  const maxValues = keys.map(k => Math.max(ev.metrics_a[k] || 0, ev.metrics_b[k] || 0) * 1.2 || 10);
+  if (!ev.metrics_a || !ev.metrics_b) return undefined;
+  const m_a = ev.metrics_a;
+  const m_b = ev.metrics_b;
+  const keys = Object.keys(m_a);
+  if (keys.length === 0) return undefined;
+  const maxValues = keys.map(k => Math.max(m_a[k] || 0, m_b[k] || 0) * 1.2 || 10);
 
   return {
     backgroundColor: 'transparent',
@@ -318,12 +328,16 @@ const metricsChartOption = computed(() => {
       name: 'Метрики',
       type: 'radar',
       data: [
-        { value: keys.map(k => ev.metrics_a[k]), name: 'Файл 1', itemStyle: { color: '#3b82f6' }, areaStyle: { color: 'rgba(59, 130, 246, 0.3)' } },
-        { value: keys.map(k => ev.metrics_b[k]), name: 'Файл 2', itemStyle: { color: '#ef4444' }, areaStyle: { color: 'rgba(239, 68, 68, 0.3)' } }
+        { value: keys.map(k => m_a[k]), name: 'Файл 1', itemStyle: { color: '#3b82f6' }, areaStyle: { color: 'rgba(59, 130, 246, 0.3)' } },
+        { value: keys.map(k => m_b[k]), name: 'Файл 2', itemStyle: { color: '#ef4444' }, areaStyle: { color: 'rgba(239, 68, 68, 0.3)' } }
       ]
     }]
   };
 });
+
+const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
+  return hash.occurrences?.some(o => o.submission === sub);
+};
 </script>
 
 <template>
@@ -551,13 +565,13 @@ const metricsChartOption = computed(() => {
                                 <span class="fw-medium text-dark font-monospace small">{{ hash.token_sequence }}</span>
                               </td>
                               <td class="py-3 px-4 text-center">
-                                 <span v-if="hash.occurrences.find((o) => o.submission === 'a')" class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-50 px-3 py-2 rounded-pill">
+                                 <span v-if="hasOccurrence(hash, 'a')" class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-50 px-3 py-2 rounded-pill">
                                     Знайдено
                                  </span>
                                  <span v-else class="text-muted">-</span>
                               </td>
                               <td class="py-3 px-4 text-center">
-                                 <span v-if="hash.occurrences.find((o) => o.submission === 'b')" class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-50 px-3 py-2 rounded-pill">
+                                 <span v-if="hasOccurrence(hash, 'b')" class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-50 px-3 py-2 rounded-pill">
                                     Знайдено
                                  </span>
                                  <span v-else class="text-muted">-</span>
