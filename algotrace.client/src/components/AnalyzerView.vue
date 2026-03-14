@@ -196,14 +196,18 @@ const getLinesContent = (code: string | undefined, lines: number[] | undefined, 
   const codeLines = code.split('\n');
   const result: string[] = [];
 
-  if (type === 'ast_tree_mapping' && lines.length === 2 && lines[0] !== undefined && lines[1] !== undefined && lines[0] !== lines[1]) {
-     for (let i = lines[0]; i <= lines[1]; i++) {
-        if (codeLines[i - 1]) result.push(`${i}: ${codeLines[i - 1].trim()}`);
+  const start = lines[0];
+  const end = lines[1];
+  if (type === 'ast_tree_mapping' && lines.length === 2 && start !== undefined && end !== undefined && start !== end) {
+     for (let i = start; i <= end; i++) {
+        const lineContent = codeLines[i - 1];
+        if (lineContent) result.push(`${i}: ${lineContent.trim()}`);
      }
   } else {
      const uniqueLines = [...new Set(lines)].sort((a, b) => a - b);
      uniqueLines.forEach(l => {
-       if (codeLines[l - 1]) result.push(`${l}: ${codeLines[l - 1].trim()}`);
+       const lineContent = codeLines[l - 1];
+       if (lineContent) result.push(`${l}: ${lineContent.trim()}`);
      });
   }
   return result.join('\n');
@@ -255,12 +259,13 @@ const getHighlightedLines = (fileId: 'a' | 'b', evidenceType: string, evidenceDa
 const updateMonacoDecorations = () => {
   if (!editorRefA.value || !editorRefB.value || !activeAlgorithm.value || !monacoInstance) return;
   const algo = activeAlgorithm.value;
+  const m = monacoInstance;
 
   const linesA = getHighlightedLines('a', algo.evidence_type, algo.evidence);
   const linesB = getHighlightedLines('b', algo.evidence_type, algo.evidence);
 
   const createRanges = (lines: number[]) => lines.map(l => ({
-    range: new monacoInstance.Range(l, 1, l, 1),
+    range: new m.Range(l, 1, l, 1),
     options: { isWholeLine: true, className: 'plagiarism-highlight', marginClassName: 'plagiarism-margin' }
   }));
 
@@ -287,7 +292,7 @@ const buildASTVisData = (nodes: ASTNode[]): { nodes: VisNode[], edges: VisEdge[]
   return { nodes: visNodes, edges: visEdges };
 };
 
-const buildCFGVisData = (graph: CFGGraph): { nodes: VisNode[], edges: VisEdge[] } => {
+const buildCFGVisData = (graph: CFGGraph | undefined): { nodes: VisNode[], edges: VisEdge[] } => {
   const visNodes: VisNode[] = [];
   const visEdges: VisEdge[] = [];
   if (!graph || !graph.nodes) return { nodes: visNodes, edges: visEdges };

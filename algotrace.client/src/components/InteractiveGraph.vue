@@ -23,7 +23,7 @@ const initGraph = () => {
       autoResize: true,
       nodes: {
         shape: 'box',
-        margin: 12,
+        margin: { top: 12, right: 12, bottom: 12, left: 12 },
         font: { color: '#212529', face: 'monospace', size: 14 },
         color: { background: '#ffffff', border: '#ced4da', highlight: { background: '#e9ecef', border: '#0d6efd' } },
         borderWidth: 2,
