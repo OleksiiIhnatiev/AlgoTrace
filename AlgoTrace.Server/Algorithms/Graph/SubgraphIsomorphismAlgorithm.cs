@@ -1,5 +1,6 @@
 using AlgoTrace.Server.Interfaces;
-using AlgoTrace.Server.Models.DTO;
+using AlgoTrace.Server.Models.DTO.Analysis;
+using AlgoTrace.Server.Models.Tree;
 
 namespace AlgoTrace.Server.Algorithms.Graph
 {
@@ -9,23 +10,27 @@ namespace AlgoTrace.Server.Algorithms.Graph
         public string Name => "Subgraph Isomorphism Search";
 
         public List<DetailedMatch> Execute(
-            string sourceCode,
-            string targetCode,
+            UniversalNode treeA,
+            UniversalNode treeB,
             Dictionary<string, object> parameters,
             out double similarityScore,
             out CodeGraph graphA,
             out CodeGraph graphB
         )
         {
-            graphA = GraphUtils.BuildGraph(sourceCode);
-            graphB = GraphUtils.BuildGraph(targetCode);
+            graphA = GraphUtils.BuildGraph(treeA);
+            graphB = GraphUtils.BuildGraph(treeB);
 
             var matches = new List<DetailedMatch>();
 
             var typesA = graphA.Nodes.Select(n => n.Type).ToList();
             var typesB = graphB.Nodes.Select(n => n.Type).ToList();
 
-            int matchedNodes = 0;
+            if (typesA.Count == 0 || typesB.Count == 0)
+            {
+                similarityScore = 0.0;
+                return matches;
+            }
 
             for (int i = 0; i <= typesB.Count - typesA.Count; i++)
             {
@@ -41,11 +46,11 @@ namespace AlgoTrace.Server.Algorithms.Graph
 
                 if (isSubGraph)
                 {
-                    matchedNodes = typesA.Count;
                     similarityScore = 100.0;
                     return matches;
                 }
             }
+
             similarityScore = 0.0;
             return matches;
         }

@@ -1,5 +1,4 @@
-using AlgoTrace.Server.Models.DTO;
-using AlgoTrace.Server.ParserFactory;
+using AlgoTrace.Server.Models.Tree;
 
 namespace AlgoTrace.Server.Interfaces
 {

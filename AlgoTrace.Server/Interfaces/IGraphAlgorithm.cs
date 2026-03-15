@@ -1,5 +1,6 @@
 using AlgoTrace.Server.Algorithms.Graph;
-using AlgoTrace.Server.Models.DTO;
+using AlgoTrace.Server.Models.DTO.Analysis;
+using AlgoTrace.Server.Models.Tree;
 
 namespace AlgoTrace.Server.Interfaces
 {
@@ -8,8 +9,8 @@ namespace AlgoTrace.Server.Interfaces
         string Key { get; }
         string Name { get; }
         List<DetailedMatch> Execute(
-            string sourceCode,
-            string targetCode,
+            UniversalNode treeA,
+            UniversalNode treeB,
             Dictionary<string, object> parameters,
             out double similarityScore,
             out CodeGraph graphA,

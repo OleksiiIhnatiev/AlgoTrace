@@ -1,6 +1,7 @@
 using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO;
-using AlgoTrace.Server.ParserFactory;
+using AlgoTrace.Server.Models.DTO.Analysis;
+using AlgoTrace.Server.Models.Tree;
 
 namespace AlgoTrace.Server.Algorithms.Tree
 {

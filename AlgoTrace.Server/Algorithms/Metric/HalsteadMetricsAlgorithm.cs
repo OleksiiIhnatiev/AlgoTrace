@@ -1,5 +1,5 @@
 using AlgoTrace.Server.Interfaces;
-using AlgoTrace.Server.Models.DTO;
+using AlgoTrace.Server.Models.DTO.Analysis;
 
 namespace AlgoTrace.Server.Algorithms.Metric
 {

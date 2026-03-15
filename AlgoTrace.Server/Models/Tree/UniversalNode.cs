@@ -1,8 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using AlgoTrace.Server.Models.DTO;
+using AlgoTrace.Server.Models.DTO.Analysis;
 
-namespace AlgoTrace.Server.ParserFactory
+namespace AlgoTrace.Server.Models.Tree
 {
     public class UniversalNode
     {

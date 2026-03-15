@@ -6,6 +6,8 @@
     <SpaRoot>..\algotrace.client</SpaRoot>
     <SpaProxyLaunchCommand>npm run dev</SpaProxyLaunchCommand>
     <SpaProxyServerUrl>https://localhost:6015</SpaProxyServerUrl>
+    
+    <DefaultItemExcludes>$(DefaultItemExcludes);storage\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>

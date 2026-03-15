@@ -1,5 +1,5 @@
 ﻿using AlgoTrace.Server.Interfaces;
-using AlgoTrace.Server.Models.DTO;
+using AlgoTrace.Server.Models.DTO.Analysis;
 
 namespace AlgoTrace.Server.Services
 {
@@ -43,18 +43,26 @@ namespace AlgoTrace.Server.Services
         {
             return extension switch
             {
-                ".py" => "python",
                 ".cs" => "csharp",
-                ".cpp" => "cpp",
-                ".c" => "c",
+                ".py" => "python",
                 ".java" => "java",
-                ".js" => "javascript",
-                ".ts" => "typescript",
+                ".kt" or ".kts" => "kotlin",
+                ".js" or ".jsx" => "javascript",
+                ".ts" or ".tsx" => "typescript",
+                ".c" => "c",
+                ".cpp" or ".h" or ".hpp" or ".m" => "cpp",
                 ".go" => "go",
+                ".rs" => "rust",
+                ".swift" => "swift",
                 ".rb" => "ruby",
                 ".php" => "php",
+                ".sql" => "sql",
                 ".html" => "html",
-                ".css" => "css",
+                ".xml" => "xml",
+                ".css" or ".scss" or ".sass" or ".less" => "css",
+                ".json" => "json",
+                ".yaml" or ".yml" => "yaml",
+                ".sh" or ".bash" or ".ps1" or ".bat" => "bash",
                 _ => "unknown",
             };
         }

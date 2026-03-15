@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
-namespace AlgoTrace.Server.Models.DTO
+namespace AlgoTrace.Server.Models.DTO.Analysis
 {
     public class UnifiedAnalysisRequest
     {

@@ -1,6 +1,5 @@
-﻿using System.Security.Claims;
-using AlgoTrace.Server.Interfaces;
-using AlgoTrace.Server.Models.DTO;
+﻿using AlgoTrace.Server.Interfaces;
+using AlgoTrace.Server.Models.DTO.Directory;
 using AlgoTrace.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

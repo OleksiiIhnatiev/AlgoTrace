@@ -1,3 +1,4 @@
+using AlgoTrace.Server.Models.Tree;
 using System.Text.RegularExpressions;
 
 namespace AlgoTrace.Server.Algorithms.Graph
@@ -6,8 +7,8 @@ namespace AlgoTrace.Server.Algorithms.Graph
     {
         public int Id { get; set; }
         public int LineIndex { get; set; }
-        public string Content { get; set; }
-        public string Type { get; set; }
+        public string Content { get; set; } = "";
+        public string Type { get; set; } = "";
         public HashSet<string> Variables { get; set; } = new();
     }
 
@@ -15,7 +16,7 @@ namespace AlgoTrace.Server.Algorithms.Graph
     {
         public int SourceId { get; set; }
         public int TargetId { get; set; }
-        public string Type { get; set; }
+        public string Type { get; set; } = "";
     }
 
     public class CodeGraph
@@ -26,46 +27,65 @@ namespace AlgoTrace.Server.Algorithms.Graph
 
     public static class GraphUtils
     {
-        public static CodeGraph BuildGraph(string code, bool includeDataDeps = false)
+        public static CodeGraph BuildGraph(UniversalNode rootNode, bool includeDataDeps = false)
         {
             var graph = new CodeGraph();
-            var lines = code.Split('\n');
+            if (rootNode == null) return graph;
 
-            for (int i = 0; i < lines.Length; i++)
+            int idCounter = 0;
+
+            int Traverse(UniversalNode node, int parentId = -1)
             {
-                var line = lines[i].Trim();
-                if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#"))
-                    continue;
+                int currentId = idCounter++;
 
-                var node = new GraphNode
+                var gNode = new GraphNode
                 {
-                    Id = i,
-                    LineIndex = i,
-                    Content = line,
-                    Type = GetNodeType(line),
+                    Id = currentId,
+                    LineIndex = currentId,
+                    Content = string.IsNullOrWhiteSpace(node.Value) ? node.Type : node.Value,
+                    Type = node.Type
                 };
 
-                if (includeDataDeps)
+                if (includeDataDeps && !string.IsNullOrWhiteSpace(gNode.Content))
                 {
-                    var matches = Regex.Matches(line, @"\b[a-zA-Z_][a-zA-Z0-9_]*\b");
+                    var matches = Regex.Matches(gNode.Content, @"\b[a-zA-Z_][a-zA-Z0-9_]*\b");
                     foreach (Match m in matches)
-                        node.Variables.Add(m.Value);
+                        gNode.Variables.Add(m.Value);
                 }
 
-                graph.Nodes.Add(node);
+                graph.Nodes.Add(gNode);
+
+                if (parentId != -1)
+                {
+                    graph.Edges.Add(new GraphEdge
+                    {
+                        SourceId = parentId,
+                        TargetId = currentId,
+                        Type = "hierarchy"
+                    });
+                }
+
+                int previousChildId = -1;
+                foreach (var child in node.Children)
+                {
+                    int childId = Traverse(child, currentId);
+
+                    if (previousChildId != -1)
+                    {
+                        graph.Edges.Add(new GraphEdge
+                        {
+                            SourceId = previousChildId,
+                            TargetId = childId,
+                            Type = "flow"
+                        });
+                    }
+                    previousChildId = childId;
+                }
+
+                return currentId;
             }
 
-            for (int i = 0; i < graph.Nodes.Count - 1; i++)
-            {
-                graph.Edges.Add(
-                    new GraphEdge
-                    {
-                        SourceId = graph.Nodes[i].Id,
-                        TargetId = graph.Nodes[i + 1].Id,
-                        Type = "flow",
-                    }
-                );
-            }
+            Traverse(rootNode);
 
             if (includeDataDeps)
             {
@@ -73,16 +93,15 @@ namespace AlgoTrace.Server.Algorithms.Graph
                 {
                     for (int j = i + 1; j < graph.Nodes.Count; j++)
                     {
-                        if (graph.Nodes[i].Variables.Overlaps(graph.Nodes[j].Variables))
+                        if (graph.Nodes[i].Variables.Count > 0 &&
+                            graph.Nodes[i].Variables.Overlaps(graph.Nodes[j].Variables))
                         {
-                            graph.Edges.Add(
-                                new GraphEdge
-                                {
-                                    SourceId = graph.Nodes[i].Id,
-                                    TargetId = graph.Nodes[j].Id,
-                                    Type = "data",
-                                }
-                            );
+                            graph.Edges.Add(new GraphEdge
+                            {
+                                SourceId = graph.Nodes[i].Id,
+                                TargetId = graph.Nodes[j].Id,
+                                Type = "data"
+                            });
                         }
                     }
                 }
@@ -90,11 +109,5 @@ namespace AlgoTrace.Server.Algorithms.Graph
 
             return graph;
         }
-
-        private static string GetNodeType(string line) =>
-            line.StartsWith("if ") || line.StartsWith("while ") || line.StartsWith("for ")
-                ? "control"
-            : line.StartsWith("def ") ? "def"
-            : "statement";
     }
 }

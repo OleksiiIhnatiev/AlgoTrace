@@ -1,5 +1,5 @@
 ﻿using AlgoTrace.Server.Models;
-using AlgoTrace.Server.Models.DTO;
+using AlgoTrace.Server.Models.DTO.Directory;
 
 namespace AlgoTrace.Server.Interfaces
 {

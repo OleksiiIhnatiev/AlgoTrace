@@ -1,5 +1,6 @@
 using AlgoTrace.Server.Interfaces;
-using AlgoTrace.Server.Models.DTO;
+using AlgoTrace.Server.Models.DTO.Analysis;
+using AlgoTrace.Server.Models.Tree;
 
 namespace AlgoTrace.Server.Algorithms.Graph
 {
@@ -9,16 +10,16 @@ namespace AlgoTrace.Server.Algorithms.Graph
         public string Name => "Control Flow Graph Comparison";
 
         public List<DetailedMatch> Execute(
-            string sourceCode,
-            string targetCode,
+            UniversalNode treeA,
+            UniversalNode treeB,
             Dictionary<string, object> parameters,
             out double similarityScore,
             out CodeGraph graphA,
             out CodeGraph graphB
         )
         {
-            graphA = GraphUtils.BuildGraph(sourceCode);
-            graphB = GraphUtils.BuildGraph(targetCode);
+            graphA = GraphUtils.BuildGraph(treeA);
+            graphB = GraphUtils.BuildGraph(treeB);
 
             var matches = new List<DetailedMatch>();
             int matchCount = 0;
@@ -35,32 +36,22 @@ namespace AlgoTrace.Server.Algorithms.Graph
                     matchCount++;
                     if (nodeA.Content == nodeB.Content)
                     {
-                        matches.Add(
-                            new DetailedMatch
-                            {
-                                Id = i + 1000,
-                                Type = "CFG Node Match",
-                                LeftLines = new List<int>
-                                {
-                                    nodeA.LineIndex + 1,
-                                    nodeA.LineIndex + 1,
-                                },
-                                RightLines = new List<int>
-                                {
-                                    nodeB.LineIndex + 1,
-                                    nodeB.LineIndex + 1,
-                                },
-                                Severity = "med",
-                            }
-                        );
+                        matches.Add(new DetailedMatch
+                        {
+                            Id = i + 1000,
+                            Type = "CFG Node Match",
+                            LeftLines = new List<int> { nodeA.LineIndex + 1, nodeA.LineIndex + 1 },
+                            RightLines = new List<int> { nodeB.LineIndex + 1, nodeB.LineIndex + 1 },
+                            Severity = "med",
+                        });
                     }
                 }
             }
 
-            similarityScore =
-                minLen > 0
-                    ? (double)matchCount / Math.Max(graphA.Nodes.Count, graphB.Nodes.Count) * 100
-                    : 0;
+            similarityScore = minLen > 0
+                ? (double)matchCount / Math.Max(graphA.Nodes.Count, graphB.Nodes.Count) * 100
+                : 0;
+
             return matches;
         }
     }

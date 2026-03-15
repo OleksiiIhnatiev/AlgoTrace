@@ -1,4 +1,4 @@
-﻿namespace AlgoTrace.Server.Models.DTO
+﻿namespace AlgoTrace.Server.Models.DTO.Directory
 {
     public class FileDownloadResult
     {

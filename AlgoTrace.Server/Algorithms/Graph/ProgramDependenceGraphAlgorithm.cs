@@ -1,5 +1,6 @@
 using AlgoTrace.Server.Interfaces;
-using AlgoTrace.Server.Models.DTO;
+using AlgoTrace.Server.Models.DTO.Analysis;
+using AlgoTrace.Server.Models.Tree;
 
 namespace AlgoTrace.Server.Algorithms.Graph
 {
@@ -9,26 +10,29 @@ namespace AlgoTrace.Server.Algorithms.Graph
         public string Name => "Program Dependence Graph";
 
         public List<DetailedMatch> Execute(
-            string sourceCode,
-            string targetCode,
+            UniversalNode treeA,
+            UniversalNode treeB,
             Dictionary<string, object> parameters,
             out double similarityScore,
             out CodeGraph graphA,
             out CodeGraph graphB
         )
         {
-            graphA = GraphUtils.BuildGraph(sourceCode, includeDataDeps: true);
-            graphB = GraphUtils.BuildGraph(targetCode, includeDataDeps: true);
+            graphA = GraphUtils.BuildGraph(treeA, includeDataDeps: true);
+            graphB = GraphUtils.BuildGraph(treeB, includeDataDeps: true);
 
             var matches = new List<DetailedMatch>();
             int edgeMatches = 0;
 
-            foreach (var edgeA in graphA.Edges.Where(e => e.Type == "data"))
+            var dataEdgesA = graphA.Edges.Where(e => e.Type == "data").ToList();
+            var dataEdgesB = graphB.Edges.Where(e => e.Type == "data").ToList();
+
+            foreach (var edgeA in dataEdgesA)
             {
                 var srcA = graphA.Nodes.FirstOrDefault(n => n.Id == edgeA.SourceId);
                 var tgtA = graphA.Nodes.FirstOrDefault(n => n.Id == edgeA.TargetId);
 
-                foreach (var edgeB in graphB.Edges.Where(e => e.Type == "data"))
+                foreach (var edgeB in dataEdgesB)
                 {
                     var srcB = graphB.Nodes.FirstOrDefault(n => n.Id == edgeB.SourceId);
                     var tgtB = graphB.Nodes.FirstOrDefault(n => n.Id == edgeB.TargetId);
@@ -38,33 +42,33 @@ namespace AlgoTrace.Server.Algorithms.Graph
                         if (srcA.Type == srcB.Type && tgtA.Type == tgtB.Type)
                         {
                             edgeMatches++;
-                            matches.Add(
-                                new DetailedMatch
+                            matches.Add(new DetailedMatch
+                            {
+                                Id = edgeMatches + 5000,
+                                Type = "Data Dependency Match",
+                                LeftLines = new List<int>
                                 {
-                                    Id = edgeMatches + 5000,
-                                    Type = "Data Dependency Match",
-                                    LeftLines = new List<int>
-                                    {
-                                        srcA.LineIndex + 1,
-                                        tgtA.LineIndex + 1,
-                                    },
-                                    RightLines = new List<int>
-                                    {
-                                        srcB.LineIndex + 1,
-                                        tgtB.LineIndex + 1,
-                                    },
-                                    Severity = "high",
-                                }
-                            );
+                                    srcA.LineIndex + 1,
+                                    tgtA.LineIndex + 1,
+                                },
+                                RightLines = new List<int>
+                                {
+                                    srcB.LineIndex + 1,
+                                    tgtB.LineIndex + 1,
+                                },
+                                Severity = "high",
+                            });
+
                             break;
                         }
                     }
                 }
             }
-            similarityScore =
-                graphA.Edges.Count > 0
-                    ? Math.Min(100, (double)edgeMatches / graphA.Edges.Count * 100)
-                    : 0;
+
+            similarityScore = dataEdgesA.Count > 0
+                ? Math.Min(100, (double)edgeMatches / dataEdgesA.Count * 100)
+                : 0;
+
             return matches;
         }
     }

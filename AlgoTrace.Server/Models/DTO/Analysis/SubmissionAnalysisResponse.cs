@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace AlgoTrace.Server.Models.DTO
+namespace AlgoTrace.Server.Models.DTO.Analysis
 {
     public class SubmissionAnalysisResponse
     {
