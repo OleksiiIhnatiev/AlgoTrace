@@ -11,7 +11,6 @@
         public Guid? ParentId { get; set; }
         public virtual Folder Parent { get; set; }
         public virtual ICollection<Folder> SubFolders { get; set; } = new List<Folder>();
-
-        public virtual ICollection<File> Files { get; set; } = new List<File>();
+        public virtual ICollection<SourceFile> Files { get; set; } = new List<SourceFile>();
     }
 }

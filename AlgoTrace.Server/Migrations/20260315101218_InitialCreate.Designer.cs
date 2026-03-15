@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AlgoTrace.Server.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260314122437_InitialCreate")]
+    [Migration("20260315101218_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -25,7 +25,33 @@ namespace AlgoTrace.Server.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("AlgoTrace.Server.Models.File", b =>
+            modelBuilder.Entity("AlgoTrace.Server.Models.Folder", b =>
+                {
+                    b.Property<Guid>("FolderId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("FolderId");
+
+                    b.HasIndex("ParentId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Folders");
+                });
+
+            modelBuilder.Entity("AlgoTrace.Server.Models.SourceFile", b =>
                 {
                     b.Property<Guid>("FileId")
                         .ValueGeneratedOnAdd()
@@ -52,33 +78,7 @@ namespace AlgoTrace.Server.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Files");
-                });
-
-            modelBuilder.Entity("AlgoTrace.Server.Models.Folder", b =>
-                {
-                    b.Property<Guid>("FolderId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<Guid?>("ParentId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.HasKey("FolderId");
-
-                    b.HasIndex("ParentId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("Folders");
+                    b.ToTable("SourceFiles");
                 });
 
             modelBuilder.Entity("AlgoTrace.Server.Models.User", b =>
@@ -279,23 +279,6 @@ namespace AlgoTrace.Server.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("AlgoTrace.Server.Models.File", b =>
-                {
-                    b.HasOne("AlgoTrace.Server.Models.Folder", "Folder")
-                        .WithMany("Files")
-                        .HasForeignKey("FolderId");
-
-                    b.HasOne("AlgoTrace.Server.Models.User", "User")
-                        .WithMany("Files")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Folder");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("AlgoTrace.Server.Models.Folder", b =>
                 {
                     b.HasOne("AlgoTrace.Server.Models.Folder", "Parent")
@@ -310,6 +293,23 @@ namespace AlgoTrace.Server.Migrations
                         .IsRequired();
 
                     b.Navigation("Parent");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("AlgoTrace.Server.Models.SourceFile", b =>
+                {
+                    b.HasOne("AlgoTrace.Server.Models.Folder", "Folder")
+                        .WithMany("Files")
+                        .HasForeignKey("FolderId");
+
+                    b.HasOne("AlgoTrace.Server.Models.User", "User")
+                        .WithMany("Files")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Folder");
 
                     b.Navigation("User");
                 });

@@ -45,7 +45,7 @@ builder.Services.AddScoped<IMetricAlgorithm, HalsteadMetricsAlgorithm>();
 builder.Services.AddScoped<IMetricAlgorithm, McCabeComplexityAlgorithm>();
 
 builder.Services.AddScoped<IUnifiedAnalysisService, UnifiedAnalysisService>();
-
+builder.Services.AddScoped<IDirectoryService, DirectoryService>();
 builder.Services.AddScoped<ISubmissionService, SubmissionService>();
 
 builder.Services.AddScoped<ICodeParser, CSharpParser>();

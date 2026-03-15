@@ -1,6 +1,4 @@
-﻿using System.Reflection.Emit;
-using AlgoTrace.Server.Models;
-using AlgoTrace.Server.Models;
+﻿using AlgoTrace.Server.Models;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,7 +10,8 @@ namespace AlgoTrace.Server.Data
             : base(options) { }
 
         public DbSet<Folder> Folders { get; set; }
-        public DbSet<Models.File> Files { get; set; }
+
+        public DbSet<SourceFile> SourceFiles { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -26,7 +25,11 @@ namespace AlgoTrace.Server.Data
                 .OnDelete(DeleteBehavior.Restrict);
 
             builder
-                .Entity<Models.File>()
+                .Entity<SourceFile>()
+                .HasKey(f => f.FileId);
+
+            builder
+                .Entity<SourceFile>()
                 .HasOne(f => f.User)
                 .WithMany(u => u.Files)
                 .HasForeignKey(f => f.UserId)

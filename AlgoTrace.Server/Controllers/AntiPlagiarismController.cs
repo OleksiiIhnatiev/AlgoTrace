@@ -94,8 +94,9 @@ namespace AlgoTrace.Server.Controllers
                 }
 
                 var targetFile = await _context
-                    .Files.AsNoTracking()
+                    .SourceFiles.AsNoTracking()
                     .FirstOrDefaultAsync(f => f.FileId == fileId);
+
                 if (targetFile == null)
                 {
                     results[docId] = new UnifiedAnalysisResponse
@@ -105,8 +106,6 @@ namespace AlgoTrace.Server.Controllers
                     continue;
                 }
 
-                // ЗАМЕНИТЕ "Storage" на папку, куда реально сохраняются загруженные файлы сервером
-                // Например: "Uploads", "wwwroot/files" и т.д.
                 var storageFolder = Path.Combine(Directory.GetCurrentDirectory(), "Storage");
                 var fullFilePath = Path.Combine(storageFolder, targetFile.Path);
 
