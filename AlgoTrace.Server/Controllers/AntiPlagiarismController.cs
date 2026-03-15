@@ -55,9 +55,9 @@ namespace AlgoTrace.Server.Controllers
                 MainSubmission = new CodeFile
                 {
                     Filename = mainFile.Filename,
-                    Content = mainFile.Content
+                    Content = mainFile.Content,
                 },
-                Results = new List<DocumentComparisonResult>()
+                Results = new List<DocumentComparisonResult>(),
             };
 
             var executeCategories = new ExecuteCategories();
@@ -96,11 +96,13 @@ namespace AlgoTrace.Server.Controllers
             {
                 if (!System.Guid.TryParse(docId, out var fileId))
                 {
-                    multiResponse.Results.Add(new DocumentComparisonResult
-                    {
-                        DocumentId = docId,
-                        Error = "invalid_document_id"
-                    });
+                    multiResponse.Results.Add(
+                        new DocumentComparisonResult
+                        {
+                            DocumentId = docId,
+                            Error = "invalid_document_id",
+                        }
+                    );
                     continue;
                 }
 
@@ -110,11 +112,13 @@ namespace AlgoTrace.Server.Controllers
 
                 if (targetFile == null)
                 {
-                    multiResponse.Results.Add(new DocumentComparisonResult
-                    {
-                        DocumentId = docId,
-                        Error = "document_not_found_in_db"
-                    });
+                    multiResponse.Results.Add(
+                        new DocumentComparisonResult
+                        {
+                            DocumentId = docId,
+                            Error = "document_not_found_in_db",
+                        }
+                    );
                     continue;
                 }
 
@@ -123,11 +127,13 @@ namespace AlgoTrace.Server.Controllers
 
                 if (!System.IO.File.Exists(fullFilePath))
                 {
-                    multiResponse.Results.Add(new DocumentComparisonResult
-                    {
-                        DocumentId = docId,
-                        Error = "document_file_missing_on_disk"
-                    });
+                    multiResponse.Results.Add(
+                        new DocumentComparisonResult
+                        {
+                            DocumentId = docId,
+                            Error = "document_file_missing_on_disk",
+                        }
+                    );
                     continue;
                 }
 
@@ -153,17 +159,19 @@ namespace AlgoTrace.Server.Controllers
 
                 var unifiedResult = _unifiedService.Analyze(unifiedRequest);
 
-                multiResponse.Results.Add(new DocumentComparisonResult
-                {
-                    DocumentId = docId,
-                    TargetFile = new CodeFile
+                multiResponse.Results.Add(
+                    new DocumentComparisonResult
                     {
-                        Filename = targetFile.Name,
-                        Content = targetContent
-                    },
-                    GlobalSimilarityScore = unifiedResult.GlobalSimilarityScore,
-                    CategoriesResults = unifiedResult.CategoriesResults
-                });
+                        DocumentId = docId,
+                        TargetFile = new CodeFile
+                        {
+                            Filename = targetFile.Name,
+                            Content = targetContent,
+                        },
+                        GlobalSimilarityScore = unifiedResult.GlobalSimilarityScore,
+                        CategoriesResults = unifiedResult.CategoriesResults,
+                    }
+                );
             }
 
             return Ok(multiResponse);

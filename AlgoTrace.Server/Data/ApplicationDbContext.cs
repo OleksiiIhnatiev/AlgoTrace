@@ -24,9 +24,7 @@ namespace AlgoTrace.Server.Data
                 .HasForeignKey(f => f.ParentId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            builder
-                .Entity<SourceFile>()
-                .HasKey(f => f.FileId);
+            builder.Entity<SourceFile>().HasKey(f => f.FileId);
 
             builder
                 .Entity<SourceFile>()

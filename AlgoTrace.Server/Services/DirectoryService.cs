@@ -21,9 +21,14 @@ namespace AlgoTrace.Server.Services
 
         public async Task<IEnumerable<FolderDto>> GetAllFoldersAsync(string userId)
         {
-            return await _context.Folders
-                .Where(f => f.UserId == userId)
-                .Select(f => new FolderDto { FolderId = f.FolderId, Name = f.Name, ParentId = f.ParentId })
+            return await _context
+                .Folders.Where(f => f.UserId == userId)
+                .Select(f => new FolderDto
+                {
+                    FolderId = f.FolderId,
+                    Name = f.Name,
+                    ParentId = f.ParentId,
+                })
                 .ToListAsync();
         }
 
@@ -31,13 +36,13 @@ namespace AlgoTrace.Server.Services
         {
             if (folderId == null)
             {
-                var rootFolders = await _context.Folders
-                    .Where(f => f.UserId == userId && f.ParentId == null)
+                var rootFolders = await _context
+                    .Folders.Where(f => f.UserId == userId && f.ParentId == null)
                     .Select(f => new FolderDto { FolderId = f.FolderId, Name = f.Name })
                     .ToListAsync();
 
-                var rootFiles = await _context.SourceFiles
-                    .Where(f => f.UserId == userId && f.FolderId == null)
+                var rootFiles = await _context
+                    .SourceFiles.Where(f => f.UserId == userId && f.FolderId == null)
                     .Select(f => new FileDto { FileId = f.FileId, Name = f.Name })
                     .ToListAsync();
 
@@ -46,24 +51,29 @@ namespace AlgoTrace.Server.Services
                     FolderId = null,
                     Name = "Мій диск",
                     Folders = rootFolders,
-                    Files = rootFiles
+                    Files = rootFiles,
                 };
             }
 
-            var folder = await _context.Folders
-                .Include(f => f.SubFolders)
+            var folder = await _context
+                .Folders.Include(f => f.SubFolders)
                 .Include(f => f.Files)
                 .FirstOrDefaultAsync(f => f.UserId == userId && f.FolderId == folderId);
 
-            if (folder == null) return null;
+            if (folder == null)
+                return null;
 
             return new FolderContentDto
             {
                 FolderId = folder.FolderId,
                 Name = folder.Name,
                 ParentId = folder.ParentId,
-                Folders = folder.SubFolders.Select(s => new FolderDto { FolderId = s.FolderId, Name = s.Name }),
-                Files = folder.Files.Select(f => new FileDto { FileId = f.FileId, Name = f.Name })
+                Folders = folder.SubFolders.Select(s => new FolderDto
+                {
+                    FolderId = s.FolderId,
+                    Name = s.Name,
+                }),
+                Files = folder.Files.Select(f => new FileDto { FileId = f.FileId, Name = f.Name }),
             };
         }
 
@@ -82,8 +92,11 @@ namespace AlgoTrace.Server.Services
 
         public async Task<bool> RenameFolderAsync(Guid folderId, string newName, string userId)
         {
-            var folder = await _context.Folders.FirstOrDefaultAsync(f => f.FolderId == folderId && f.UserId == userId);
-            if (folder == null) return false;
+            var folder = await _context.Folders.FirstOrDefaultAsync(f =>
+                f.FolderId == folderId && f.UserId == userId
+            );
+            if (folder == null)
+                return false;
 
             folder.Name = newName;
             await _context.SaveChangesAsync();
@@ -92,12 +105,13 @@ namespace AlgoTrace.Server.Services
 
         public async Task<bool> DeleteFolderAsync(Guid folderId, string userId)
         {
-            var folder = await _context.Folders
-                .Include(f => f.SubFolders)
+            var folder = await _context
+                .Folders.Include(f => f.SubFolders)
                 .Include(f => f.Files)
                 .FirstOrDefaultAsync(f => f.FolderId == folderId && f.UserId == userId);
 
-            if (folder == null) return false;
+            if (folder == null)
+                return false;
 
             await DeleteFolderContentsRecursive(folder);
             _context.Folders.Remove(folder);
@@ -107,7 +121,9 @@ namespace AlgoTrace.Server.Services
 
         private async Task DeleteFolderContentsRecursive(Folder folder)
         {
-            var files = await _context.SourceFiles.Where(f => f.FolderId == folder.FolderId).ToListAsync();
+            var files = await _context
+                .SourceFiles.Where(f => f.FolderId == folder.FolderId)
+                .ToListAsync();
             foreach (var file in files)
             {
                 var fullPath = Path.Combine(_storagePath, file.Path);
@@ -116,7 +132,9 @@ namespace AlgoTrace.Server.Services
                 _context.SourceFiles.Remove(file);
             }
 
-            var subFolders = await _context.Folders.Where(f => f.ParentId == folder.FolderId).ToListAsync();
+            var subFolders = await _context
+                .Folders.Where(f => f.ParentId == folder.FolderId)
+                .ToListAsync();
             foreach (var sub in subFolders)
                 await DeleteFolderContentsRecursive(sub);
         }
@@ -144,25 +162,32 @@ namespace AlgoTrace.Server.Services
 
         public async Task<FileDownloadResult?> DownloadFileAsync(Guid fileId, string userId)
         {
-            var file = await _context.SourceFiles.FirstOrDefaultAsync(f => f.FileId == fileId && f.UserId == userId);
-            if (file == null) return null;
+            var file = await _context.SourceFiles.FirstOrDefaultAsync(f =>
+                f.FileId == fileId && f.UserId == userId
+            );
+            if (file == null)
+                return null;
 
             var filePath = Path.Combine(_storagePath, file.Path);
-            if (!System.IO.File.Exists(filePath)) return null;
+            if (!System.IO.File.Exists(filePath))
+                return null;
 
             var bytes = await System.IO.File.ReadAllBytesAsync(filePath);
             return new FileDownloadResult
             {
                 Bytes = bytes,
                 ContentType = "application/octet-stream",
-                FileName = file.Name
+                FileName = file.Name,
             };
         }
 
         public async Task<bool> DeleteFileAsync(Guid fileId, string userId)
         {
-            var file = await _context.SourceFiles.FirstOrDefaultAsync(f => f.FileId == fileId && f.UserId == userId);
-            if (file == null) return false;
+            var file = await _context.SourceFiles.FirstOrDefaultAsync(f =>
+                f.FileId == fileId && f.UserId == userId
+            );
+            if (file == null)
+                return false;
 
             var filePath = Path.Combine(_storagePath, file.Path);
             if (System.IO.File.Exists(filePath))

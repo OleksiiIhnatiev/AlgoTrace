@@ -1,9 +1,9 @@
-﻿using AlgoTrace.Server.Interfaces;
+﻿using System.Security.Claims;
+using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO;
 using AlgoTrace.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 
 namespace AlgoTrace.Server.Controllers
 {
@@ -34,7 +34,8 @@ namespace AlgoTrace.Server.Controllers
         public async Task<IActionResult> GetFolder(Guid? folderId)
         {
             var result = await _directoryService.GetFolderContentAsync(folderId, GetUserId());
-            if (result == null) return NotFound();
+            if (result == null)
+                return NotFound();
 
             return Ok(result);
         }
@@ -50,7 +51,8 @@ namespace AlgoTrace.Server.Controllers
         public async Task<IActionResult> RenameFolder(Guid id, [FromBody] string newName)
         {
             var success = await _directoryService.RenameFolderAsync(id, newName, GetUserId());
-            if (!success) return NotFound();
+            if (!success)
+                return NotFound();
 
             return Ok();
         }
@@ -59,7 +61,8 @@ namespace AlgoTrace.Server.Controllers
         public async Task<IActionResult> DeleteFolder(Guid id)
         {
             var success = await _directoryService.DeleteFolderAsync(id, GetUserId());
-            if (!success) return NotFound();
+            if (!success)
+                return NotFound();
 
             return Ok();
         }
@@ -79,7 +82,8 @@ namespace AlgoTrace.Server.Controllers
         public async Task<IActionResult> DownloadFile(Guid fileId)
         {
             var result = await _directoryService.DownloadFileAsync(fileId, GetUserId());
-            if (result == null) return NotFound("Файл не знайдено або видалено з сервера.");
+            if (result == null)
+                return NotFound("Файл не знайдено або видалено з сервера.");
 
             return File(result.Bytes, result.ContentType, result.FileName);
         }
@@ -88,7 +92,8 @@ namespace AlgoTrace.Server.Controllers
         public async Task<IActionResult> DeleteFile(Guid fileId)
         {
             var success = await _directoryService.DeleteFileAsync(fileId, GetUserId());
-            if (!success) return NotFound();
+            if (!success)
+                return NotFound();
 
             return Ok();
         }
