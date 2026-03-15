@@ -12,8 +12,8 @@ import { TitleComponent, TooltipComponent, LegendComponent } from 'echarts/compo
 import { CanvasRenderer } from 'echarts/renderers';
 import VChart from 'vue-echarts';
 import type { Node as VisNode, Edge as VisEdge } from 'vis-network';
+import { isDarkMode, toggleTheme } from '../composables/useTheme';
 
-// --- Data Interfaces ---
 interface MatchedBlock {
   start_line_a: number;
   end_line_a: number;
@@ -115,7 +115,25 @@ interface Report {
   categories_results: Category[];
   source_files: SourceFiles;
   language: string;
+  error?: string | null;
 }
+
+interface DocumentComparisonResult {
+  document_id?: string;
+  target_file?: { filename: string; content: string };
+  global_similarity_score: number;
+  categories_results?: Category[];
+  error?: string | null;
+}
+
+interface MultiReport {
+  analysis_id: string;
+  main_submission?: { filename: string; content: string };
+  results: DocumentComparisonResult[];
+  language?: string;
+}
+
+type RawReport = Report | MultiReport;
 
 use([TitleComponent, TooltipComponent, LegendComponent, RadarChart, CanvasRenderer]);
 
@@ -123,28 +141,77 @@ const router = useRouter();
 const activeCategory = ref<string | null>(null);
 const activeAlgorithm = ref<Algorithm | null>(null);
 
+const isMultiReport = computed(() => {
+  const raw = analysisState.currentReport as unknown as RawReport | null;
+  return raw && 'results' in raw && Array.isArray(raw.results);
+});
+
+const multiResults = computed(() => {
+  if (isMultiReport.value) {
+    return (analysisState.currentReport as unknown as MultiReport).results;
+  }
+  return [];
+});
+
+const selectedResultIndex = ref(0);
+
+const report = computed<Report | null>(() => {
+  const raw = analysisState.currentReport as unknown as RawReport | null;
+  if (!raw) return null;
+
+  if (isMultiReport.value) {
+    const multiRaw = raw as MultiReport;
+    const result = multiRaw.results[selectedResultIndex.value];
+    if (!result) return null;
+    return {
+      analysis_id: multiRaw.analysis_id,
+      global_similarity_score: result.global_similarity_score,
+      categories_results: result.categories_results || [],
+      source_files: {
+        name_a: multiRaw.main_submission?.filename || 'Файл 1',
+        file_a: multiRaw.main_submission?.content || '',
+        name_b: result.target_file?.filename || 'Файл 2',
+        file_b: result.target_file?.content || ''
+      },
+      language: multiRaw.language || 'python',
+      error: result.error || null
+    } as Report;
+  }
+
+  return raw as Report;
+});
+
+watch(selectedResultIndex, () => {
+  const rep = report.value;
+  if (rep && rep.categories_results && rep.categories_results.length > 0) {
+    const firstCat = rep.categories_results[0];
+    if (firstCat) selectCategory(firstCat);
+  } else {
+    activeCategory.value = null;
+    activeAlgorithm.value = null;
+  }
+});
+
 onMounted(() => {
   if (!analysisState.currentReport) {
     router.push('/');
     return;
   }
-  const rep = analysisState.currentReport as unknown as Report;
-  if (rep.categories_results && rep.categories_results.length > 0) {
+  const rep = report.value;
+  if (rep && rep.categories_results && rep.categories_results.length > 0) {
     const firstCat = rep.categories_results[0];
     if (firstCat) selectCategory(firstCat);
   }
 });
-
-const report = computed<Report | null>(() => analysisState.currentReport as Report | null);
 
 const globalScore = computed(() => {
   return report.value?.global_similarity_score ? Math.round(report.value.global_similarity_score * 100) : 0;
 });
 
 const getScoreColorHex = (score: number) => {
-  if (score < 30) return '#10b981'; // Изумрудный (success)
-  if (score < 70) return '#f59e0b'; // Янтарный (warning)
-  return '#ef4444'; // Красный (danger)
+  if (score < 30) return '#10b981';
+  if (score < 70) return '#f59e0b';
+  return '#ef4444';
 };
 
 const getBgColor = (score: number) => {
@@ -164,6 +231,86 @@ const formatCategoryName = (name: string) => {
     'metrics_based': 'Метрики коду'
   };
   return map[name] || name;
+};
+
+const formatMethodName = (method: string) => {
+  const map: Record<string, string> = {
+    'levenshtein': 'Відстань Левенштейна',
+    'line_matching': 'Порядкове Порівняння',
+    'rabin_karp': 'Алгоритм Рабіна-Карпа',
+    'ngram_search': 'Пошук за N-грамами',
+    'jaccard_token': 'Токени Джаккарда',
+    'winnowing': 'Вінновінг (Winnowing)',
+    'ast_hashing': 'Хешування AST',
+    'ast_compare': 'Пряме Порівняння AST',
+    'subtree_isomorphism': 'Ізоморфізм Піддерев',
+    'cfg': 'Граф потоку керування (CFG)',
+    'pdg': 'Граф залежностей даних (PDG)',
+    'subgraph_isomorphism': 'Ізоморфізм підграфів',
+    'halstead': 'Метрики Холстеда',
+    'mccabe': 'Складність Маккейба'
+  };
+  return map[method] || method.replace(/_/g, ' ');
+};
+
+const formatEvidenceType = (type: string) => {
+  const map: Record<string, string> = {
+    'text_highlight': 'Виділення тексту',
+    'token_sequence': 'Послідовність токенів',
+    'ast_tree_mapping': 'Відображення AST-дерева',
+    'graph_mapping': 'Відображення графа',
+    'metric_comparison': 'Порівняння метрик'
+  };
+  return map[type] || type;
+};
+
+const formatSeverity = (severity: string) => {
+  const map: Record<string, string> = {
+    'high': 'Високий',
+    'med': 'Середній',
+    'low': 'Низький'
+  };
+  return map[severity] || severity;
+};
+
+const formatMatchType = (type: string) => {
+  const map: Record<string, string> = {
+    'Identical Subtree Found': 'Знайдено ідентичне піддерево',
+    'Full Structure Match': 'Повний структурний збіг',
+    'CFG Node Match': 'Збіг вузлів CFG',
+    'Data Dependency Match': 'Збіг залежностей даних'
+  };
+  return map[type] || type;
+};
+
+const formatNodeType = (type: string) => {
+  const map: Record<string, string> = {
+    'statement': 'Інструкція',
+    'control': 'Керування',
+    'def': 'Визначення'
+  };
+  return map[type] || type;
+};
+
+const formatTokenSequence = (seq: string) => {
+  const map: Record<string, string> = {
+    'Token Sequence Match': 'Збіг послідовності токенів',
+    'Token Vocabulary Similarity': 'Схожість словника токенів'
+  };
+  return map[seq] || seq;
+};
+
+const formatMetricKey = (key: string) => {
+  const map: Record<string, string> = {
+    'cyclomatic_complexity': 'Цикломатична складність',
+    'halstead_effort': 'Зусилля (Halstead)',
+    'halstead_volume': 'Об\'єм (Halstead)',
+    'halstead_difficulty': 'Складність (Halstead)',
+    'halstead_bugs': 'Очікувані помилки (Halstead)',
+    'maintainability_index': 'Індекс підтримуваності',
+    'loc': 'Кількість рядків коду (LOC)'
+  };
+  return map[key] || String(key).replace(/_/g, ' ');
 };
 
 const selectCategory = (cat: Category) => {
@@ -213,7 +360,6 @@ const getLinesContent = (code: string | undefined, lines: number[] | undefined, 
   return result.join('\n');
 };
 
-// --- ИНТЕГРАЦИЯ MONACO EDITOR ---
 const editorRefA = shallowRef();
 const editorRefB = shallowRef();
 let monacoInstance: typeof monaco | null = null;
@@ -278,7 +424,6 @@ const updateMonacoDecorations = () => {
 
 watch(activeAlgorithm, () => nextTick(updateMonacoDecorations));
 
-// --- ИНТЕГРАЦИЯ VIS-NETWORK ---
 const buildASTVisData = (nodes: ASTNode[]): { nodes: VisNode[], edges: VisEdge[] } => {
   const visNodes: VisNode[] = [];
   const visEdges: VisEdge[] = [];
@@ -307,7 +452,6 @@ const buildCFGVisData = (graph: CFGGraph | undefined): { nodes: VisNode[], edges
   return { nodes: visNodes, edges: visEdges };
 };
 
-// --- ИНТЕГРАЦИЯ ECHARTS ---
 const metricsChartOption = computed(() => {
   if (activeAlgorithm.value?.evidence_type !== 'metric_comparison') return undefined;
   const ev = activeAlgorithm.value.evidence;
@@ -321,13 +465,13 @@ const metricsChartOption = computed(() => {
   return {
     backgroundColor: 'transparent',
     tooltip: { trigger: 'item' },
-    legend: { data: ['Файл 1', 'Файл 2'], textStyle: { color: '#495057' }, bottom: 0 },
+    legend: { data: ['Файл 1', 'Файл 2'], textStyle: { color: isDarkMode.value ? '#e0e0e0' : '#495057' }, bottom: 0 },
     radar: {
-      indicator: keys.map((k, i) => ({ name: k.replace(/_/g, ' '), max: maxValues[i] })),
-      splitArea: { areaStyle: { color: ['rgba(0,0,0,0.02)', 'rgba(0,0,0,0.05)'] } },
-      splitLine: { lineStyle: { color: 'rgba(0,0,0,0.1)' } },
-      axisName: { color: '#212529' },
-      axisLine: { lineStyle: { color: 'rgba(0,0,0,0.1)' } }
+      indicator: keys.map((k, i) => ({ name: formatMetricKey(k), max: maxValues[i] })),
+      splitArea: { areaStyle: { color: isDarkMode.value ? ['rgba(255,255,255,0.02)', 'rgba(255,255,255,0.05)'] : ['rgba(0,0,0,0.02)', 'rgba(0,0,0,0.05)'] } },
+      splitLine: { lineStyle: { color: isDarkMode.value ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' } },
+      axisName: { color: isDarkMode.value ? '#e0e0e0' : '#212529' },
+      axisLine: { lineStyle: { color: isDarkMode.value ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' } }
     },
     series: [{
       name: 'Метрики',
@@ -347,7 +491,6 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
 
 <template>
   <div class="min-vh-100 dashboard-bg pb-5" v-if="report">
-    <!-- Light Glassmorphism Navbar -->
     <nav class="navbar navbar-light bg-white bg-opacity-75 border-bottom py-3 backdrop-blur sticky-top z-3 shadow-sm">
       <div class="container-fluid px-4">
         <div class="d-flex align-items-center">
@@ -359,18 +502,32 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
             Аналітика Коду
           </span>
         </div>
-        <div class="badge bg-light border px-4 py-2 rounded-pill text-secondary shadow-sm font-monospace">
-          ID: {{ report.analysis_id }}
+        <div class="d-flex align-items-center">
+          <button @click="toggleTheme" class="btn btn-light rounded-circle shadow-sm border hover-lift me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;" title="Змінити тему">
+            <i class="bi fs-5" :class="isDarkMode ? 'bi-sun-fill text-warning' : 'bi-moon-stars-fill text-secondary'"></i>
+          </button>
+          <div class="badge bg-light border px-4 py-2 rounded-pill text-secondary shadow-sm font-monospace">
+            ID: {{ report.analysis_id }}
+          </div>
         </div>
       </div>
     </nav>
 
     <div class="container-fluid px-4 mt-4">
       <div class="row g-4 h-100">
-
-        <!-- SIDEBAR -->
         <div class="col-xl-3 col-lg-4 d-flex flex-column gap-4">
-           <!-- Global Score Widget -->
+
+           <div v-if="isMultiReport" class="glass-card p-4 position-relative overflow-hidden shadow-sm">
+              <h6 class="text-muted text-uppercase fw-bold mb-3" style="letter-spacing: 1px; font-size: 0.75rem;">
+                <i class="bi bi-files me-2"></i>Файли для порівняння
+              </h6>
+              <select v-model="selectedResultIndex" class="form-select border-0 bg-light rounded-3 shadow-sm fw-medium text-dark py-2 px-3" style="cursor: pointer;">
+                <option v-for="(res, idx) in multiResults" :key="res.document_id || idx" :value="idx">
+                  {{ res.target_file?.filename || 'Файл ' + (idx + 1) }} ({{ Math.round((res.global_similarity_score || 0) * 100) }}%)
+                </option>
+              </select>
+           </div>
+
            <div class="glass-card p-5 text-center position-relative overflow-hidden">
              <div class="position-absolute top-0 start-0 w-100 h-100 opacity-25" :style="`background: radial-gradient(circle at center, ${getScoreColorHex(globalScore)} 0%, transparent 70%);`"></div>
              <h5 class="fw-bold text-dark mb-4 position-relative z-1 text-uppercase tracking-wider fs-6">Глобальна схожість</h5>
@@ -401,12 +558,15 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
              </div>
            </div>
 
-           <!-- Categories Menu -->
-           <div class="glass-card p-3 flex-grow-1 custom-scrollbar overflow-auto" style="max-height: calc(100vh - 400px);">
+           <div class="glass-card p-3 flex-grow-1 custom-scrollbar overflow-auto" style="min-height: 400px; height: 0;">
               <h6 class="text-muted text-uppercase fw-bold mb-3 px-3" style="letter-spacing: 1.5px; font-size: 0.75rem;">Дерево Аналізу</h6>
-              <div class="d-flex flex-column gap-2">
+
+              <div v-if="report.error" class="alert alert-danger m-2 py-2 px-3 small border-0 bg-danger bg-opacity-10 text-danger rounded-3 fw-medium">
+                 <i class="bi bi-exclamation-triangle-fill me-2"></i> {{ report.error }}
+              </div>
+
+              <div class="d-flex flex-column gap-2" v-else>
                 <div v-for="cat in report.categories_results" :key="cat.category_name">
-                   <!-- Category Button -->
                    <button class="btn w-100 text-start d-flex justify-content-between align-items-center p-3 rounded-4 glass-btn"
                            :class="{'glass-btn-active': activeCategory === cat.category_name}"
                            @click="selectCategory(cat)">
@@ -423,7 +583,6 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                        <span class="badge rounded-pill shadow-sm" :class="getBgColor(cat.category_similarity_score * 100)">{{ formatScore(cat.category_similarity_score) }}</span>
                    </button>
 
-                   <!-- Algorithms List -->
                    <transition name="slide-fade">
                      <div v-if="activeCategory === cat.category_name" class="ps-4 pe-2 py-2 d-flex flex-column gap-1 overflow-hidden border-start border-primary border-opacity-25 ms-4 mt-2 mb-2">
                          <button v-for="algo in cat.algorithms" :key="algo.method"
@@ -431,7 +590,7 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                                  :class="{'algo-btn-active': activeAlgorithm?.method === algo.method}"
                                  @click="selectAlgorithm(cat, algo)">
                              <div class="d-flex justify-content-between align-items-center">
-                                 <span class="text-capitalize text-dark fw-medium"><i class="bi bi-cpu me-2 text-primary opacity-75"></i> {{ algo.method.replace(/_/g, ' ') }}</span>
+                                 <span class="text-dark fw-medium"><i class="bi bi-cpu me-2 text-primary opacity-75"></i> {{ formatMethodName(algo.method) }}</span>
                                  <span class="text-muted fw-bold font-monospace" style="font-size: 0.75rem;">{{ formatScore(algo.similarity_score) }}</span>
                              </div>
                          </button>
@@ -442,7 +601,6 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
            </div>
         </div>
 
-        <!-- MAIN CONTENT AREA -->
         <div class="col-xl-9 col-lg-8">
            <div class="glass-card h-100 d-flex flex-column overflow-hidden">
 
@@ -452,13 +610,12 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
               </div>
 
               <div v-else class="d-flex flex-column h-100 animate__fadeIn">
-                <!-- Header -->
                 <div class="p-4 border-bottom d-flex justify-content-between align-items-center bg-light">
                    <div>
-                     <h3 class="fw-bolder text-dark mb-1 text-capitalize d-flex align-items-center">
-                       <i class="bi bi-box-seam text-primary me-3"></i> {{ activeAlgorithm.method.replace(/_/g, ' ') }}
+                     <h3 class="fw-bolder text-dark mb-1 d-flex align-items-center">
+                       <i class="bi bi-box-seam text-primary me-3"></i> {{ formatMethodName(activeAlgorithm.method) }}
                      </h3>
-                     <span class="text-muted small font-monospace"><i class="bi bi-info-circle me-1"></i> Тип доказів: {{ activeAlgorithm.evidence_type }}</span>
+                     <span class="text-muted small font-monospace"><i class="bi bi-info-circle me-1"></i> Тип доказів: {{ formatEvidenceType(activeAlgorithm.evidence_type) }}</span>
                    </div>
                    <div class="text-end">
                      <div class="text-muted small mb-2 fw-bold text-uppercase tracking-wider" style="font-size: 0.7rem;">Рівень Збігу</div>
@@ -486,7 +643,7 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                           <div class="mac-body bg-white flex-grow-1 position-relative" style="height: 500px;">
                              <VueMonacoEditor
                                v-model:value="report.source_files.file_a"
-                               theme="vs"
+                               :theme="isDarkMode ? 'vs-dark' : 'vs'"
                                :language="report.language || 'cpp'"
                                :options="{ readOnly: true, minimap: { enabled: false }, scrollBeyondLastLine: false, fontSize: 13, smoothScrolling: true }"
                                @mount="(editor, monaco) => handleEditorMount(editor, monaco, 'a')"
@@ -507,7 +664,7 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                           <div class="mac-body bg-white flex-grow-1 position-relative" style="height: 500px;">
                              <VueMonacoEditor
                                v-model:value="report.source_files.file_b"
-                               theme="vs"
+                               :theme="isDarkMode ? 'vs-dark' : 'vs'"
                                :language="report.language || 'cpp'"
                                :options="{ readOnly: true, minimap: { enabled: false }, scrollBeyondLastLine: false, fontSize: 13, smoothScrolling: true }"
                                @mount="(editor, monaco) => handleEditorMount(editor, monaco, 'b')"
@@ -517,7 +674,6 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                      </div>
                    </div>
 
-                   <!-- Text Highlight Specific Accordions -->
                    <div v-if="activeAlgorithm.evidence_type === 'text_highlight' && activeAlgorithm.evidence?.matched_blocks?.length">
                       <h6 class="text-muted text-uppercase fw-bold mb-3 tracking-wider"><i class="bi bi-layout-text-sidebar-reverse me-2"></i> Деталі текстових збігів</h6>
                       <div class="accordion light-accordion shadow-sm" :id="'acc-' + activeAlgorithm.method">
@@ -548,7 +704,6 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                       </div>
                    </div>
 
-                   <!-- Token Sequence specific table -->
                    <div v-else-if="activeAlgorithm.evidence_type === 'token_sequence'">
                       <div v-if="!activeAlgorithm.evidence?.matched_hashes || activeAlgorithm.evidence.matched_hashes.length === 0" class="text-center py-5">
                         <i class="bi bi-shield-check text-success display-1 d-block mb-3 opacity-50 glow-text"></i>
@@ -567,7 +722,7 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                             <tr v-for="(hash, hIdx) in activeAlgorithm.evidence.matched_hashes" :key="hIdx">
                               <td class="py-3 px-4">
                                 <span class="badge bg-light text-secondary border me-3 font-monospace px-2 py-1">{{ hash.hash_value }}</span>
-                                <span class="fw-medium text-dark font-monospace small">{{ hash.token_sequence }}</span>
+                                <span class="fw-medium text-dark font-monospace small">{{ formatTokenSequence(hash.token_sequence) }}</span>
                               </td>
                               <td class="py-3 px-4 text-center">
                                  <span v-if="hasOccurrence(hash, 'a')" class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-50 px-3 py-2 rounded-pill">
@@ -587,7 +742,6 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                       </div>
                    </div>
 
-                   <!-- AST Mapping Specific -->
                    <div v-else-if="activeAlgorithm.evidence_type === 'ast_tree_mapping'">
                       <div class="d-flex align-items-center justify-content-between mb-4">
                         <h6 class="text-muted text-uppercase fw-bold mb-0 tracking-wider"><i class="bi bi-diagram-3 me-2"></i> Зведення збігів AST</h6>
@@ -606,17 +760,16 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                               </thead>
                               <tbody>
                                 <tr v-for="(match, idx) in aggregateMatches(activeAlgorithm.evidence)" :key="idx">
-                                  <td class="py-3 px-4 fw-medium text-dark"><i class="bi bi-diagram-2 text-secondary opacity-75 me-3 fs-5"></i>{{ match.type }}</td>
+                                  <td class="py-3 px-4 fw-medium text-dark"><i class="bi bi-diagram-2 text-secondary opacity-75 me-3 fs-5"></i>{{ formatMatchType(match.type) }}</td>
                                   <td class="py-3 px-4 text-center"><span class="badge bg-light border rounded-pill px-3 py-2 fs-6 text-dark">{{ match.count }}</span></td>
                                   <td class="py-3 px-4">
-                                     <span class="badge rounded-pill px-3 py-2 border" :class="match.severity === 'high' ? 'bg-danger bg-opacity-25 text-danger border-danger border-opacity-50' : match.severity === 'med' ? 'bg-warning bg-opacity-25 text-warning border-warning border-opacity-50' : 'bg-info bg-opacity-25 text-info border-info border-opacity-50'">{{ match.severity }}</span>
+                                     <span class="badge rounded-pill px-3 py-2 border" :class="match.severity === 'high' ? 'bg-danger bg-opacity-25 text-danger border-danger border-opacity-50' : match.severity === 'med' ? 'bg-warning bg-opacity-25 text-warning border-warning border-opacity-50' : 'bg-info bg-opacity-25 text-info border-info border-opacity-50'">{{ formatSeverity(match.severity) }}</span>
                                   </td>
                                 </tr>
                               </tbody>
                             </table>
                          </div>
 
-                          <!-- Деталізація (Докази) -->
                           <div class="accordion light-accordion mt-4 shadow-sm" :id="'acc-ast-' + activeAlgorithm.method">
                             <div class="accordion-item border-0">
                               <h2 class="accordion-header">
@@ -629,7 +782,7 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                                    <ul class="list-group list-group-flush">
                                       <li v-for="(m, idx) in activeAlgorithm.evidence" :key="idx" class="list-group-item bg-transparent flex-column py-4 gap-3 border-bottom border-opacity-10">
                                          <div class="d-flex justify-content-between align-items-center w-100 mb-2">
-                                           <span class="small fw-bold text-dark"><i class="bi bi-link-45deg text-secondary fs-5 me-2"></i>{{ m.type }} (Рівень: {{ m.severity }})</span>
+                                           <span class="small fw-bold text-dark"><i class="bi bi-link-45deg text-secondary fs-5 me-2"></i>{{ formatMatchType(m.type) }} (Рівень: {{ formatSeverity(m.severity) }})</span>
                                            <span v-if="!((m.leftLines && m.leftLines.length) || (m.rightLines && m.rightLines.length))" class="badge bg-light text-secondary border px-3 py-2 rounded-pill">Структурний збіг (весь код)</span>
                                          </div>
                                          <div class="d-flex flex-column flex-md-row gap-3 w-100" v-if="(m.leftLines && m.leftLines.length) || (m.rightLines && m.rightLines.length)">
@@ -705,7 +858,6 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                       </div>
                    </div>
 
-                   <!-- Graph Mapping Specific -->
                    <div v-else-if="activeAlgorithm.evidence_type === 'graph_mapping'">
                       <div class="d-flex align-items-center justify-content-between mb-4">
                         <h6 class="text-muted text-uppercase fw-bold mb-0 tracking-wider"><i class="bi bi-share me-2"></i> Зведення збігів графів</h6>
@@ -722,10 +874,10 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                           </thead>
                           <tbody>
                             <tr v-for="(match, idx) in aggregateMatches(activeAlgorithm.evidence.matches)" :key="idx">
-                              <td class="py-3 px-4 fw-medium text-dark"><i class="bi bi-bezier2 text-secondary opacity-75 me-3 fs-5"></i>{{ match.type }}</td>
+                              <td class="py-3 px-4 fw-medium text-dark"><i class="bi bi-bezier2 text-secondary opacity-75 me-3 fs-5"></i>{{ formatMatchType(match.type) }}</td>
                               <td class="py-3 px-4 text-center"><span class="badge bg-light border rounded-pill px-3 py-2 fs-6 text-dark">{{ match.count }}</span></td>
                               <td class="py-3 px-4">
-                                 <span class="badge rounded-pill px-3 py-2 border" :class="match.severity === 'high' ? 'bg-danger bg-opacity-25 text-danger border-danger border-opacity-50' : match.severity === 'med' ? 'bg-warning bg-opacity-25 text-warning border-warning border-opacity-50' : 'bg-info bg-opacity-25 text-info border-info border-opacity-50'">{{ match.severity }}</span>
+                                 <span class="badge rounded-pill px-3 py-2 border" :class="match.severity === 'high' ? 'bg-danger bg-opacity-25 text-danger border-danger border-opacity-50' : match.severity === 'med' ? 'bg-warning bg-opacity-25 text-warning border-warning border-opacity-50' : 'bg-info bg-opacity-25 text-info border-info border-opacity-50'">{{ formatSeverity(match.severity) }}</span>
                               </td>
                             </tr>
                           </tbody>
@@ -745,7 +897,7 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                                <ul class="list-group list-group-flush">
                                  <li class="list-group-item bg-transparent d-flex align-items-start py-3 border-bottom" v-for="node in activeAlgorithm.evidence.graph_a?.nodes" :key="node.id">
                                    <div class="flex-grow-1">
-                                     <div class="mb-2"><span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-50" style="font-size: 0.7rem;">{{ node.type }}</span></div>
+                                     <div class="mb-2"><span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-50" style="font-size: 0.7rem;">{{ formatNodeType(node.type) }}</span></div>
                                      <code class="text-dark bg-light border px-3 py-2 rounded-3 d-block font-monospace" style="font-size: 0.8rem; word-break: break-all;">{{ node.content }}</code>
                                    </div>
                                  </li>
@@ -765,7 +917,7 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                                <ul class="list-group list-group-flush">
                                  <li class="list-group-item bg-transparent d-flex align-items-start py-3 border-bottom" v-for="node in activeAlgorithm.evidence.graph_b?.nodes" :key="node.id">
                                    <div class="flex-grow-1">
-                                     <div class="mb-2"><span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-50" style="font-size: 0.7rem;">{{ node.type }}</span></div>
+                                     <div class="mb-2"><span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-50" style="font-size: 0.7rem;">{{ formatNodeType(node.type) }}</span></div>
                                      <code class="text-dark bg-light border px-3 py-2 rounded-3 d-block font-monospace" style="font-size: 0.8rem; word-break: break-all;">{{ node.content }}</code>
                                    </div>
                                  </li>
@@ -776,7 +928,6 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                       </div>
                    </div>
 
-                   <!-- Metric Comparison Specific -->
                    <div v-else-if="activeAlgorithm.evidence_type === 'metric_comparison'">
                       <div class="row g-4">
                         <div class="col-xl-4 col-lg-5">
@@ -785,7 +936,7 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                             <h5 class="text-primary mb-4 d-flex align-items-center fw-bold position-relative z-1"><i class="bi bi-bar-chart-steps me-3"></i> Метрики Файл 1</h5>
                             <div class="d-flex flex-column gap-2 position-relative z-1">
                                <div v-for="(val, key) in activeAlgorithm.evidence.metrics_a" :key="key" class="d-flex justify-content-between align-items-center border-bottom py-3">
-                                  <span class="text-muted text-capitalize fw-medium">{{ String(key).replace(/_/g, ' ') }}</span>
+                                  <span class="text-muted fw-medium">{{ formatMetricKey(String(key)) }}</span>
                                   <span class="fw-bold fs-4 text-dark font-monospace">{{ typeof val === 'number' && !Number.isInteger(val) ? val.toFixed(2) : val }}</span>
                                </div>
                             </div>
@@ -794,7 +945,7 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                             <h5 class="text-danger mb-4 d-flex align-items-center fw-bold position-relative z-1"><i class="bi bi-bar-chart-steps me-3"></i> Метрики Файл 2</h5>
                             <div class="d-flex flex-column gap-2 position-relative z-1">
                                <div v-for="(val, key) in activeAlgorithm.evidence.metrics_b" :key="key" class="d-flex justify-content-between align-items-center border-bottom py-3">
-                                  <span class="text-muted text-capitalize fw-medium">{{ String(key).replace(/_/g, ' ') }}</span>
+                                  <span class="text-muted fw-medium">{{ formatMetricKey(String(key)) }}</span>
                                   <span class="fw-bold fs-4 text-dark font-monospace">{{ typeof val === 'number' && !Number.isInteger(val) ? val.toFixed(2) : val }}</span>
                                </div>
                             </div>
@@ -814,7 +965,6 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                       </div>
                    </div>
 
-                   <!-- Fallback Fallback -->
                    <div v-else>
                       <div class="bg-light p-4 rounded-4 shadow-sm border custom-scrollbar" style="max-height: 400px; overflow: auto;">
                         <pre class="m-0 text-muted small" style="font-family: 'Fira Code', monospace;"><code>{{ JSON.stringify(activeAlgorithm.evidence, null, 2) }}</code></pre>
@@ -945,7 +1095,6 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Light Table */
 .light-table {
   --bs-table-bg: transparent;
   --bs-table-color: #212529;
@@ -955,7 +1104,6 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
 .light-table td { border-bottom: 1px solid rgba(0,0,0,0.05) !important; }
 .light-table tbody tr:hover { background-color: rgba(0, 0, 0, 0.02) !important; }
 
-/* Light Accordion */
 .light-accordion .accordion-item {
   background-color: transparent;
   border: 1px solid rgba(0,0,0,0.08);

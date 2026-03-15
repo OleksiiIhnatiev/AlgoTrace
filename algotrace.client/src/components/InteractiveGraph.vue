@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, onBeforeUnmount } from 'vue';
 import { Network, type Node, type Edge, type Options } from 'vis-network';
+import { isDarkMode } from '../composables/useTheme';
 
 interface GraphData {
   nodes: Node[];
@@ -24,8 +25,8 @@ const initGraph = () => {
       nodes: {
         shape: 'box',
         margin: { top: 12, right: 12, bottom: 12, left: 12 },
-        font: { color: '#212529', face: 'monospace', size: 14 },
-        color: { background: '#ffffff', border: '#ced4da', highlight: { background: '#e9ecef', border: '#0d6efd' } },
+        font: { color: isDarkMode.value ? '#e0e0e0' : '#212529', face: 'monospace', size: 14 },
+        color: { background: isDarkMode.value ? '#2a2a2a' : '#ffffff', border: isDarkMode.value ? '#495057' : '#ced4da', highlight: { background: isDarkMode.value ? '#3a3a3a' : '#e9ecef', border: '#0d6efd' } },
         borderWidth: 2,
         shadow: true
       },
@@ -50,8 +51,9 @@ const initGraph = () => {
 
 onMounted(initGraph);
 watch(() => props.graphData, initGraph, { deep: true });
+watch(isDarkMode, initGraph);
 onBeforeUnmount(() => { if (network) network.destroy(); });
 </script>
 <template>
-  <div ref="container" class="w-100 bg-white rounded-3 border" style="height: 400px;"></div>
+  <div ref="container" class="w-100 rounded-3 border" :class="isDarkMode ? 'bg-dark' : 'bg-white'" style="height: 400px;"></div>
 </template>

@@ -45,8 +45,8 @@ namespace AlgoTrace.Server.Algorithms.Tree
                             new MatchedSubtree
                             {
                                 NodeType = nodeA.Type,
-                                NodesA = new List<MatchedNodeInfo> { CreateNodeInfo(nodeA, "a") },
-                                NodesB = new List<MatchedNodeInfo> { CreateNodeInfo(nodeB, "b") },
+                                NodesA = subtreeNodesA.Select(n => CreateNodeInfo(n, "a")).ToList(),
+                                NodesB = subtreeNodesB.Select(n => CreateNodeInfo(n, "b")).ToList(),
                             }
                         );
 

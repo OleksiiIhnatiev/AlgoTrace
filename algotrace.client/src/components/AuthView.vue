@@ -2,6 +2,7 @@
 import { authService } from '@/services/auth.service';
 import { ref, reactive } from 'vue';
 import { useRouter } from 'vue-router';
+import { isDarkMode, toggleTheme } from '../composables/useTheme';
 
 const router = useRouter();
 const isLogin = ref(true);
@@ -30,17 +31,18 @@ const handleSubmit = async () => {
         email: form.email,
         password: form.password
       });
+      await authService.init();
       router.push('/');
     } else {
       await authService.register({
         email: form.email,
         password: form.password
       });
-      // Auto-login after successful registration
       await authService.login({
         email: form.email,
         password: form.password
       });
+      await authService.init();
       router.push('/');
     }
   } catch (err: unknown) {
@@ -55,8 +57,13 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-  <div class="min-vh-100 d-flex align-items-center justify-content-center bg-light">
-    <div class="card border-0 shadow-lg rounded-4 overflow-hidden" style="max-width: 400px; width: 100%;">
+  <div class="min-vh-100 d-flex align-items-center justify-content-center bg-light position-relative">
+    <div class="position-absolute top-0 end-0 p-4 z-3">
+       <button @click="toggleTheme" class="btn btn-light rounded-circle shadow-sm border hover-lift d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;" title="Змінити тему">
+         <i class="bi fs-5" :class="isDarkMode ? 'bi-sun-fill text-warning' : 'bi-moon-stars-fill text-secondary'"></i>
+       </button>
+    </div>
+    <div class="card border-0 shadow-lg rounded-4 overflow-hidden w-100" style="max-width: 400px;">
       <div class="card-body p-5">
         <div class="text-center mb-4">
           <div class="bg-primary bg-gradient text-white rounded-3 p-2 d-inline-flex align-items-center justify-content-center shadow-sm mb-3" style="width: 50px; height: 50px;">

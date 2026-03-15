@@ -214,4 +214,37 @@ namespace AlgoTrace.Server.Models.DTO.Analysis
         [JsonPropertyName("methods")]
         public List<string> Methods { get; set; }
     }
+
+    public class MultiDocumentAnalysisResponse
+    {
+        [JsonPropertyName("analysis_id")]
+        public string AnalysisId { get; set; } = "";
+
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = "completed";
+
+        [JsonPropertyName("main_submission")]
+        public CodeFile MainSubmission { get; set; } = new();
+
+        [JsonPropertyName("results")]
+        public List<DocumentComparisonResult> Results { get; set; } = new();
+    }
+
+    public class DocumentComparisonResult
+    {
+        [JsonPropertyName("document_id")]
+        public string DocumentId { get; set; } = "";
+
+        [JsonPropertyName("target_file")]
+        public CodeFile TargetFile { get; set; } = new();
+
+        [JsonPropertyName("global_similarity_score")]
+        public double GlobalSimilarityScore { get; set; }
+
+        [JsonPropertyName("categories_results")]
+        public List<CategoryResult> CategoriesResults { get; set; } = new();
+
+        [JsonPropertyName("error")]
+        public string? Error { get; set; }
+    }
 }

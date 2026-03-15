@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, nextTick } from 'vue';
 import mermaid from 'mermaid';
+import { isDarkMode } from '../composables/useTheme';
 
 const props = defineProps<{
   definition: string;
@@ -8,7 +9,6 @@ const props = defineProps<{
 
 const svgContent = ref('');
 const hasError = ref(false);
-// Генеруємо унікальний ID для кожного графа, щоб Mermaid не плутався
 const graphId = 'mermaid_' + Math.random().toString(36).substr(2, 9);
 
 const render = async () => {
@@ -18,7 +18,7 @@ const render = async () => {
   }
   hasError.value = false;
   try {
-    mermaid.initialize({ startOnLoad: false, theme: 'default' });
+    mermaid.initialize({ startOnLoad: false, theme: isDarkMode.value ? 'dark' : 'default' });
     const { svg } = await mermaid.render(graphId, props.definition);
     svgContent.value = svg;
   } catch (e) {
@@ -29,6 +29,7 @@ const render = async () => {
 
 onMounted(() => nextTick(render));
 watch(() => props.definition, () => nextTick(render));
+watch(isDarkMode, () => nextTick(render));
 </script>
 
 <template>

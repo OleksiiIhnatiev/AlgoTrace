@@ -48,7 +48,17 @@ namespace AlgoTrace.Server.Controllers
                 return BadRequest("Invalid request. Submission and document IDs are required.");
             }
 
-            var results = new Dictionary<string, UnifiedAnalysisResponse>();
+            var mainFile = request.Submission.Files.First();
+            var multiResponse = new MultiDocumentAnalysisResponse
+            {
+                AnalysisId = $"req_multi_{System.Guid.NewGuid().ToString().Substring(0, 8)}",
+                MainSubmission = new CodeFile
+                {
+                    Filename = mainFile.Filename,
+                    Content = mainFile.Content,
+                },
+                Results = new List<DocumentComparisonResult>(),
+            };
 
             var executeCategories = new ExecuteCategories();
             if (request.AnalysisConfig?.Categories != null)
@@ -86,10 +96,13 @@ namespace AlgoTrace.Server.Controllers
             {
                 if (!System.Guid.TryParse(docId, out var fileId))
                 {
-                    results[docId] = new UnifiedAnalysisResponse
-                    {
-                        Status = "error: invalid_document_id",
-                    };
+                    multiResponse.Results.Add(
+                        new DocumentComparisonResult
+                        {
+                            DocumentId = docId,
+                            Error = "invalid_document_id",
+                        }
+                    );
                     continue;
                 }
 
@@ -99,10 +112,13 @@ namespace AlgoTrace.Server.Controllers
 
                 if (targetFile == null)
                 {
-                    results[docId] = new UnifiedAnalysisResponse
-                    {
-                        Status = "error: document_not_found_in_db",
-                    };
+                    multiResponse.Results.Add(
+                        new DocumentComparisonResult
+                        {
+                            DocumentId = docId,
+                            Error = "document_not_found_in_db",
+                        }
+                    );
                     continue;
                 }
 
@@ -111,10 +127,13 @@ namespace AlgoTrace.Server.Controllers
 
                 if (!System.IO.File.Exists(fullFilePath))
                 {
-                    results[docId] = new UnifiedAnalysisResponse
-                    {
-                        Status = "error: document_file_missing_on_disk",
-                    };
+                    multiResponse.Results.Add(
+                        new DocumentComparisonResult
+                        {
+                            DocumentId = docId,
+                            Error = "document_file_missing_on_disk",
+                        }
+                    );
                     continue;
                 }
 
@@ -138,10 +157,24 @@ namespace AlgoTrace.Server.Controllers
                     },
                 };
 
-                results[docId] = _unifiedService.Analyze(unifiedRequest);
+                var unifiedResult = _unifiedService.Analyze(unifiedRequest);
+
+                multiResponse.Results.Add(
+                    new DocumentComparisonResult
+                    {
+                        DocumentId = docId,
+                        TargetFile = new CodeFile
+                        {
+                            Filename = targetFile.Name,
+                            Content = targetContent,
+                        },
+                        GlobalSimilarityScore = unifiedResult.GlobalSimilarityScore,
+                        CategoriesResults = unifiedResult.CategoriesResults,
+                    }
+                );
             }
 
-            return Ok(results);
+            return Ok(multiResponse);
         }
     }
 }

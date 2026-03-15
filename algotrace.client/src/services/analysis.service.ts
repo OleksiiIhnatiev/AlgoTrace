@@ -41,14 +41,12 @@ export interface AnalysisMultiplePayload {
   };
 }
 
-// Глобальное состояние для хранения результатов анализа
 export const analysisState = reactive({
   currentReport: null as Record<string, unknown> | null
 });
 
 export const analysisService = {
   async analyze(endpoint: string, payload: AnalysisPayload) {
-    // Sending POST request to the specific category endpoint
     return api.post(endpoint, payload);
   },
 
