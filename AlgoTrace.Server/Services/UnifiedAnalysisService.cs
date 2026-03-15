@@ -211,7 +211,6 @@ namespace AlgoTrace.Server.Services
         {
             var categoryResult = new CategoryResult { CategoryName = "token_based" };
 
-            // Simple tokenizer logic reused from TokenAnalysisService
             var tokensA = Tokenize(a);
             var tokensB = Tokenize(b);
 
@@ -461,7 +460,6 @@ namespace AlgoTrace.Server.Services
             return categoryResult;
         }
 
-        // Helper reused from TokenAnalysisService (Duplicated to avoid tight coupling for this refactor)
         private List<TokenInfo> Tokenize(string code)
         {
             var tokens = new List<TokenInfo>();

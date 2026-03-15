@@ -1,6 +1,6 @@
 ﻿namespace AlgoTrace.Server.Models
 {
-    public class File
+    public class SourceFile
     {
         public Guid FileId { get; set; } = Guid.NewGuid();
         public string Name { get; set; }
