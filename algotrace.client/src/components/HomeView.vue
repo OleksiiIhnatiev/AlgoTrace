@@ -130,6 +130,52 @@ const analysisConfig = [
 
 const selectedMethods = ref<Record<string, string[]>>({});
 
+const isAllMethodsSelected = computed(() => {
+  return analysisConfig.every(cat => selectedMethods.value[cat.id]?.length === cat.methods.length);
+});
+
+const toggleAllMethods = (e: Event) => {
+  const isChecked = (e.target as HTMLInputElement).checked;
+  if (isChecked) {
+    analysisConfig.forEach(cat => {
+      selectedMethods.value[cat.id] = cat.methods.map(m => m.value);
+    });
+  } else {
+    selectedMethods.value = {};
+  }
+};
+
+const detectLanguage = (code: string): string | null => {
+  if (!code) return null;
+  const c = code.toLowerCase();
+  if (c.includes('using system;') || (c.includes('namespace ') && c.includes('class '))) return 'csharp';
+  if (c.includes('import java.') || (c.includes('public class ') && c.includes('public static void main'))) return 'java';
+  if (c.includes('def ') && c.includes(':') && !c.includes('{')) return 'python';
+  if (c.includes('import {') || c.includes('export const ') || c.includes('interface ') || c.includes('type ')) return 'typescript';
+  if (c.includes('#include <') || c.includes('int main()')) return 'cpp';
+  if (c.includes('<?php')) return 'php';
+  if (c.includes('package main') && c.includes('import "fmt"')) return 'go';
+  if (c.includes('fn main()') && c.includes('println!')) return 'rust';
+  if (c.includes('<html>') || c.includes('</div>')) return 'html';
+  if (c.includes('<?xml')) return 'xml';
+  if (c.includes('select ') && c.includes(' from ')) return 'sql';
+  if (c.includes('import react') || c.includes('from \'react\'') || c.includes('classname=')) return 'javascript';
+  if (c.includes('function ') || c.includes('const ') || c.includes('let ') || c.includes('console.log')) return 'javascript';
+  if (c.trim().startsWith('{') && c.trim().endsWith('}')) {
+    try { JSON.parse(code); return 'json'; } catch {}
+  }
+  return null;
+};
+
+watch(code1, (newVal, oldVal) => {
+  if (newVal && Math.abs(newVal.length - (oldVal?.length || 0)) > 20) {
+    const detected = detectLanguage(newVal);
+    if (detected) {
+      selectedLanguage.value = detected;
+    }
+  }
+});
+
 const loadStorageTree = async () => {
   if (!authState.isAuthenticated) return;
   isStorageLoading.value = true;
@@ -740,12 +786,23 @@ const resendEmail = async () => {
          <div class="position-absolute top-0 end-0 p-4 opacity-10" style="pointer-events: none;">
                 <i class="bi bi-gear-wide-connected" style="font-size: 8rem;"></i>
              </div>
-             <h4 class="fw-black mb-1 d-flex align-items-center tracking-tight text-dark position-relative z-1">
-               <i class="bi bi-cpu text-primary me-3 fs-3 glow-text-primary"></i> Вектори Аналізу
-             </h4>
-             <p class="text-muted small mb-4 fw-medium position-relative z-1">Оберіть алгоритми для глибокого структурного та семантичного сканування.</p>
+             <div class="mb-4 position-relative z-1">
+               <h4 class="fw-black mb-1 d-flex align-items-center tracking-tight text-dark">
+                 <i class="bi bi-cpu text-primary me-3 fs-3 glow-text-primary"></i> Вектори Аналізу
+               </h4>
+               <p class="text-muted small mb-0 fw-medium">Оберіть алгоритми для глибокого структурного та семантичного сканування.</p>
+             </div>
 
              <div class="d-flex flex-wrap gap-4 mb-4 p-3 rounded-4 bg-white bg-opacity-50 border shadow-sm position-relative z-1">
+                <div class="d-flex align-items-center bg-white px-3 py-2 rounded-pill shadow-sm border">
+                  <div class="form-check form-switch m-0 pe-2" style="transform: scale(1.1); transform-origin: left;">
+                    <input class="form-check-input shadow-sm cursor-pointer" type="checkbox" id="toggle-all-cats"
+                           :checked="isAllMethodsSelected" @change="toggleAllMethods">
+                  </div>
+                  <label class="fw-bold text-dark small text-uppercase tracking-wider cursor-pointer mt-1" for="toggle-all-cats">
+                    Увімкнути всі
+                  </label>
+                </div>
                 <div class="d-flex align-items-center">
                   <div class="form-check form-switch m-0 pe-2">
                     <input class="form-check-input shadow-sm cursor-pointer" type="checkbox" id="param-comments" v-model="ignoreComments">

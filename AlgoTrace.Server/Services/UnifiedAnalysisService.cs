@@ -285,20 +285,20 @@ namespace AlgoTrace.Server.Services
                 totalScore += score / 100.0;
                 count++;
 
-                var evidence = new MetricEvidence { Conclusion = $"Metrics similarity: {score:F1}%" };
+                var evidence = new MetricEvidence { Conclusion = $"Схожість метрик: {score:F1}%" };
                 if (algo.Key == "halstead")
                 {
                     var hA = MetricUtils.CalculateHalsteadMetrics(a);
                     var hB = MetricUtils.CalculateHalsteadMetrics(b);
-                    evidence.MetricsA = new Dictionary<string, double> { { "volume", hA.Volume }, { "difficulty", hA.Difficulty } };
-                    evidence.MetricsB = new Dictionary<string, double> { { "volume", hB.Volume }, { "difficulty", hB.Difficulty } };
+                    evidence.MetricsA = new Dictionary<string, double> { { "halstead_volume", hA.Volume }, { "halstead_difficulty", hA.Difficulty } };
+                    evidence.MetricsB = new Dictionary<string, double> { { "halstead_volume", hB.Volume }, { "halstead_difficulty", hB.Difficulty } };
                 }
                 else if (algo.Key == "mccabe")
                 {
                     var cA = MetricUtils.CalculateMcCabeComplexity(a);
                     var cB = MetricUtils.CalculateMcCabeComplexity(b);
-                    evidence.MetricsA = new Dictionary<string, double> { { "complexity", cA } };
-                    evidence.MetricsB = new Dictionary<string, double> { { "complexity", cB } };
+                    evidence.MetricsA = new Dictionary<string, double> { { "cyclomatic_complexity", cA } };
+                    evidence.MetricsB = new Dictionary<string, double> { { "cyclomatic_complexity", cB } };
                 }
 
                 categoryResult.Algorithms.Add(new AlgorithmResult

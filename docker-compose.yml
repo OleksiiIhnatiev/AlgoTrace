@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: algotrace_db
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Your_Strong_Password_123!" # Укажите надежный пароль
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqldata:/var/opt/mssql
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: algotrace_web
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DefaultConnection=Server=db;Database=AlgoTraceDB;User Id=sa;Password=Your_Strong_Password_123!;TrustServerCertificate=True;
+    depends_on:
+      - db
+
+volumes:
+  sqldata:
+    # Именованный volume для сохранения данных БД между перезапусками контейнеров

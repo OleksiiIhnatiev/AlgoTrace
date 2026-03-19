@@ -11,6 +11,7 @@ interface GraphData {
 const props = defineProps<{
   graphData: GraphData;
   options?: Options;
+  height?: string;
 }>();
 
 const container = ref<HTMLElement | null>(null);
@@ -55,5 +56,5 @@ watch(isDarkMode, initGraph);
 onBeforeUnmount(() => { if (network) network.destroy(); });
 </script>
 <template>
-  <div ref="container" class="w-100 rounded-3 border" :class="isDarkMode ? 'bg-dark' : 'bg-white'" style="height: 400px;"></div>
+  <div ref="container" class="w-100 rounded-3 border" :class="isDarkMode ? 'bg-dark' : 'bg-white'" :style="{ height: height || '400px' }"></div>
 </template>

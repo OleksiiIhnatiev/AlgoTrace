@@ -13,6 +13,7 @@ import { CanvasRenderer } from 'echarts/renderers';
 import VChart from 'vue-echarts';
 import type { Node as VisNode, Edge as VisEdge } from 'vis-network';
 import { isDarkMode, toggleTheme } from '../composables/useTheme';
+import ReportExportView from './ReportExportView.vue';
 
 interface MatchedBlock {
   start_line_a: number;
@@ -141,6 +142,11 @@ const router = useRouter();
 const activeCategory = ref<string | null>(null);
 const activeAlgorithm = ref<Algorithm | null>(null);
 
+const showExportModal = ref(false);
+const exportSelections = ref<Record<string, boolean>>({});
+const isGeneratingPdf = ref(false);
+const exportSelectedMethods = ref<string[]>([]);
+
 const isMultiReport = computed(() => {
   const raw = analysisState.currentReport as unknown as RawReport | null;
   return raw && 'results' in raw && Array.isArray(raw.results);
@@ -203,6 +209,32 @@ onMounted(() => {
     if (firstCat) selectCategory(firstCat);
   }
 });
+
+const openExportModal = () => {
+  if (!report.value) return;
+  exportSelections.value = {};
+  report.value.categories_results.forEach(cat => {
+    cat.algorithms.forEach(algo => {
+      exportSelections.value[algo.method] = true;
+    });
+  });
+  showExportModal.value = true;
+};
+
+const confirmExport = () => {
+  const selected = Object.keys(exportSelections.value).filter(k => exportSelections.value[k]);
+  if (selected.length === 0) {
+    alert('Оберіть хоча б один алгоритм для експорту');
+    return;
+  }
+  exportSelectedMethods.value = selected;
+  isGeneratingPdf.value = true;
+};
+
+const onPdfGenerated = () => {
+  isGeneratingPdf.value = false;
+  showExportModal.value = false;
+};
 
 const globalScore = computed(() => {
   return report.value?.global_similarity_score ? Math.round(report.value.global_similarity_score * 100) : 0;
@@ -303,9 +335,12 @@ const formatTokenSequence = (seq: string) => {
 const formatMetricKey = (key: string) => {
   const map: Record<string, string> = {
     'cyclomatic_complexity': 'Цикломатична складність',
+    'complexity': 'Цикломатична складність',
     'halstead_effort': 'Зусилля (Halstead)',
     'halstead_volume': 'Об\'єм (Halstead)',
+    'volume': 'Об\'єм (Halstead)',
     'halstead_difficulty': 'Складність (Halstead)',
+    'difficulty': 'Складність (Halstead)',
     'halstead_bugs': 'Очікувані помилки (Halstead)',
     'maintainability_index': 'Індекс підтримуваності',
     'loc': 'Кількість рядків коду (LOC)'
@@ -503,6 +538,9 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
           </span>
         </div>
         <div class="d-flex align-items-center">
+          <button @click="openExportModal" class="btn btn-outline-danger rounded-pill me-3 px-4 fw-bold d-flex align-items-center transition-all hover-glow shadow-sm bg-white">
+            <i class="bi bi-file-earmark-pdf me-2"></i> Експорт в PDF
+          </button>
           <button @click="toggleTheme" class="btn btn-light rounded-circle shadow-sm border hover-lift me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;" title="Змінити тему">
             <i class="bi fs-5" :class="isDarkMode ? 'bi-sun-fill text-warning' : 'bi-moon-stars-fill text-secondary'"></i>
           </button>
@@ -977,6 +1015,43 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
         </div>
 
       </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div v-if="showExportModal" class="modal d-block animate__animated animate__fadeIn animate__faster" tabindex="-1" style="background: rgba(0,0,0,0.5); z-index: 1050; backdrop-filter: blur(5px);">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 shadow-lg border-0">
+          <div class="modal-header border-bottom px-4 py-3 bg-light rounded-top-4">
+            <h5 class="modal-title fw-bold text-dark"><i class="bi bi-file-earmark-pdf text-danger me-2"></i> Налаштування Експорту</h5>
+            <button type="button" class="btn-close" @click="showExportModal = false"></button>
+          </div>
+          <div class="modal-body p-4 custom-scrollbar" style="max-height: 60vh; overflow-y: auto;">
+            <p class="text-muted small mb-4">Оберіть алгоритми, результати яких будуть розгорнуті та включені до PDF-звіту.</p>
+            <div v-for="cat in report?.categories_results" :key="cat.category_name" class="mb-4">
+              <h6 class="fw-bold text-dark mb-2 border-bottom pb-2"><i class="bi bi-diagram-3 text-primary me-2"></i>{{ formatCategoryName(cat.category_name) }}</h6>
+              <div class="ms-3 mt-2 d-flex flex-column gap-2">
+                <div class="form-check" v-for="algo in cat.algorithms" :key="algo.method">
+                  <input class="form-check-input cursor-pointer shadow-sm" type="checkbox" :id="'export-' + algo.method" v-model="exportSelections[algo.method]">
+                  <label class="form-check-label cursor-pointer small fw-medium text-secondary" :for="'export-' + algo.method">
+                    {{ formatMethodName(algo.method) }}
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer border-top px-4 py-3 bg-light rounded-bottom-4">
+            <button type="button" class="btn btn-light border rounded-pill px-4" @click="showExportModal = false" :disabled="isGeneratingPdf">Скасувати</button>
+            <button type="button" class="btn btn-danger rounded-pill px-4 fw-bold shadow-sm" @click="confirmExport" :disabled="isGeneratingPdf">
+              <span v-if="isGeneratingPdf" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+              <i v-else class="bi bi-printer me-2"></i> {{ isGeneratingPdf ? 'Створення...' : 'Сформувати звіт' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="isGeneratingPdf" style="position: absolute; top: 0; left: 0; width: 1000px; opacity: 0; pointer-events: none; z-index: -1000; overflow: hidden;">
+      <ReportExportView :hidden-render="true" :result-index="isMultiReport ? selectedResultIndex : 0" :methods="exportSelectedMethods" @pdf-generated="onPdfGenerated" />
     </div>
   </div>
 </template>

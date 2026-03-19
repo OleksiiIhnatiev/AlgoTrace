@@ -36,7 +36,7 @@ namespace AlgoTrace.Server.Algorithms.Metric
                     new DetailedMatch
                     {
                         Id = 9001,
-                        Type = $"McCabe Complexity Match (A:{c1}, B:{c2})",
+                        Type = $"Збіг складності McCabe (A:{c1}, B:{c2})",
                         LeftLines = new List<int> { 1, linesA },
                         RightLines = new List<int> { 1, linesB },
                         Severity = similarityScore > 95 ? "high" : "med",

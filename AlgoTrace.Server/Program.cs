@@ -72,6 +72,13 @@ builder.Services.AddScoped<ParserFactory>();
 
 var app = builder.Build();
 
+// Автоматическое применение миграций базы данных при запуске приложения
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    dbContext.Database.Migrate();
+}
+
 app.MapGroup("/auth").MapIdentityApi<User>();
 app.UseDefaultFiles();
 app.MapStaticAssets();

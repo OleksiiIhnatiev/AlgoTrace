@@ -20,6 +20,11 @@ const router = createRouter({
       component: () => import('../components/AnalyzerView.vue')
     },
     {
+      path: '/export',
+      name: 'export',
+      component: () => import('../components/ReportExportView.vue')
+    },
+    {
       path: '/storage',
       name: 'storage',
       component: () => import('../components/StorageView.vue'),
