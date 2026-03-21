@@ -413,8 +413,34 @@ const viewFile = async (file: FileEntry) => {
   }
 };
 
-const downloadFile = (fileId: string) => {
-  window.open(`${api.defaults.baseURL}/api/directory/file/download/${fileId}`, '_blank');
+const downloadFile = async (fileId: string) => {
+  try {
+    let fileName = 'downloaded_file';
+    if (selectedFile.value?.fileId === fileId) {
+      fileName = selectedFile.value.name;
+    } else {
+      const fileInList = currentFolderContent.value?.files.find(f => f.fileId === fileId);
+      if (fileInList) fileName = fileInList.name;
+    }
+
+    const response = await api.get(`/api/directory/file/download/${fileId}`, {
+      responseType: 'blob' 
+    });
+
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    
+    link.click();
+
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('Помилка завантаження:', err);
+    alert("Не вдалося завантажити файл");
+  }
 };
 
 const deleteFile = async (id: string) => {
