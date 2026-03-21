@@ -72,10 +72,15 @@ namespace AlgoTrace.Server.Controllers
         #region File Operations
 
         [HttpPost("file/upload")]
-        public async Task<IActionResult> UploadFile(IFormFile file, [FromQuery] Guid? folderId)
+        public async Task<IActionResult> UploadFiles([FromForm] List<IFormFile> files, [FromQuery] Guid? folderId)
         {
-            var fileEntry = await _directoryService.UploadFileAsync(file, folderId, GetUserId());
-            return Ok(fileEntry);
+            if (files == null || files.Count == 0)
+            {
+                return BadRequest("Не вибрано жодного файлу для завантаження.");
+            }
+
+            var fileEntries = await _directoryService.UploadFilesAsync(files, folderId, GetUserId());
+            return Ok(fileEntries);
         }
 
         [HttpGet("file/download/{fileId}")]

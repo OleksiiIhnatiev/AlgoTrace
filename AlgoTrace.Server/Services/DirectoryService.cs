@@ -124,40 +124,59 @@ namespace AlgoTrace.Server.Services
             var files = await _context
                 .SourceFiles.Where(f => f.FolderId == folder.FolderId)
                 .ToListAsync();
+
             foreach (var file in files)
             {
                 var fullPath = Path.Combine(_storagePath, file.Path);
                 if (System.IO.File.Exists(fullPath))
                     System.IO.File.Delete(fullPath);
+
                 _context.SourceFiles.Remove(file);
             }
 
             var subFolders = await _context
                 .Folders.Where(f => f.ParentId == folder.FolderId)
                 .ToListAsync();
+
             foreach (var sub in subFolders)
+            {
                 await DeleteFolderContentsRecursive(sub);
+                _context.Folders.Remove(sub);
+            }
         }
 
-        public async Task<SourceFile> UploadFileAsync(IFormFile file, Guid? folderId, string userId)
+        public async Task<IEnumerable<SourceFile>> UploadFilesAsync(IEnumerable<IFormFile> files, Guid? folderId, string userId)
         {
-            var uniqueName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
-            var filePath = Path.Combine(_storagePath, uniqueName);
+            var uploadedFiles = new List<SourceFile>();
 
-            using (var stream = new FileStream(filePath, FileMode.Create))
-                await file.CopyToAsync(stream);
-
-            var fileEntry = new SourceFile
+            foreach (var file in files)
             {
-                Name = file.FileName,
-                Path = uniqueName,
-                UserId = userId,
-                FolderId = folderId,
-            };
+                if (file.Length == 0)
+                    continue;
 
-            _context.SourceFiles.Add(fileEntry);
+                var uniqueName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
+                var filePath = Path.Combine(_storagePath, uniqueName);
+
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                var fileEntry = new SourceFile
+                {
+                    Name = file.FileName,
+                    Path = uniqueName,
+                    UserId = userId,
+                    FolderId = folderId,
+                };
+
+                _context.SourceFiles.Add(fileEntry);
+                uploadedFiles.Add(fileEntry);
+            }
+
             await _context.SaveChangesAsync();
-            return fileEntry;
+
+            return uploadedFiles;
         }
 
         public async Task<FileDownloadResult?> DownloadFileAsync(Guid fileId, string userId)
