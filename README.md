@@ -87,7 +87,18 @@ You will need to have Docker installed on your machine to build and run the cont
    ```text
    http://localhost:8080/
    ```
+### Managing the Application
 
+* **To stop the application:**
+  Run the following command to stop and remove the containers, networks, and volumes tied to the application:
+  ```sh
+  docker-compose down
+  ```
+* **To apply code changes:**
+  If you modify the source code or configurations, you need to rebuild the Docker images. Run the launch command again with the `--build` flag:
+  ```sh
+  docker-compose up -d --build
+  ```
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- USAGE EXAMPLES -->
