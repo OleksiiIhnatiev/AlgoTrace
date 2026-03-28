@@ -1,10 +1,9 @@
-using AlgoTrace.Server.Models.Tree;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using AlgoTrace.Server.Models.Tree;
 
 namespace AlgoTrace.Server.Algorithms.Graph
 {
-
     public static class GraphUtils
     {
         public class GraphNode
@@ -31,17 +30,49 @@ namespace AlgoTrace.Server.Algorithms.Graph
 
         private static readonly HashSet<string> _csharpKeywords = new HashSet<string>
         {
-            "int", "var", "string", "bool", "double", "float", "char", "object",
-            "public", "private", "protected", "internal", "static", "readonly",
-            "class", "struct", "void", "return", "new", "if", "else", "for",
-            "foreach", "while", "do", "switch", "case", "break", "continue",
-            "using", "namespace", "true", "false", "null", "this", "base"
+            "int",
+            "var",
+            "string",
+            "bool",
+            "double",
+            "float",
+            "char",
+            "object",
+            "public",
+            "private",
+            "protected",
+            "internal",
+            "static",
+            "readonly",
+            "class",
+            "struct",
+            "void",
+            "return",
+            "new",
+            "if",
+            "else",
+            "for",
+            "foreach",
+            "while",
+            "do",
+            "switch",
+            "case",
+            "break",
+            "continue",
+            "using",
+            "namespace",
+            "true",
+            "false",
+            "null",
+            "this",
+            "base",
         };
 
         public static CodeGraph BuildGraph(UniversalNode rootNode, bool includeDataDeps = false)
         {
             var graph = new CodeGraph();
-            if (rootNode == null) return graph;
+            if (rootNode == null)
+                return graph;
 
             int idCounter = 0;
 
@@ -54,10 +85,10 @@ namespace AlgoTrace.Server.Algorithms.Graph
                     Id = currentId,
                     LineIndex = currentId, // В идеале здесь должен быть node.Location.Line, если он есть
                     Content = string.IsNullOrWhiteSpace(node.Value) ? node.Type : node.Value,
-                    Type = node.Type
+                    Type = node.Type,
                 };
 
-                // ИСПРАВЛЕНИЕ: Ищем переменные ТОЛЬКО в node.Value (реальном коде), 
+                // ИСПРАВЛЕНИЕ: Ищем переменные ТОЛЬКО в node.Value (реальном коде),
                 // а не в gNode.Content (куда может попасть тип AST-узла).
                 if (includeDataDeps && !string.IsNullOrWhiteSpace(node.Value))
                 {
@@ -76,12 +107,14 @@ namespace AlgoTrace.Server.Algorithms.Graph
 
                 if (parentId != -1)
                 {
-                    graph.Edges.Add(new GraphEdge
-                    {
-                        SourceId = parentId,
-                        TargetId = currentId,
-                        Type = "hierarchy"
-                    });
+                    graph.Edges.Add(
+                        new GraphEdge
+                        {
+                            SourceId = parentId,
+                            TargetId = currentId,
+                            Type = "hierarchy",
+                        }
+                    );
                 }
 
                 int previousChildId = -1;
@@ -91,12 +124,14 @@ namespace AlgoTrace.Server.Algorithms.Graph
 
                     if (previousChildId != -1)
                     {
-                        graph.Edges.Add(new GraphEdge
-                        {
-                            SourceId = previousChildId,
-                            TargetId = childId,
-                            Type = "flow"
-                        });
+                        graph.Edges.Add(
+                            new GraphEdge
+                            {
+                                SourceId = previousChildId,
+                                TargetId = childId,
+                                Type = "flow",
+                            }
+                        );
                     }
                     previousChildId = childId;
                 }
@@ -113,15 +148,19 @@ namespace AlgoTrace.Server.Algorithms.Graph
                 {
                     for (int j = i + 1; j < graph.Nodes.Count; j++)
                     {
-                        if (graph.Nodes[i].Variables.Count > 0 &&
-                            graph.Nodes[i].Variables.Overlaps(graph.Nodes[j].Variables))
+                        if (
+                            graph.Nodes[i].Variables.Count > 0
+                            && graph.Nodes[i].Variables.Overlaps(graph.Nodes[j].Variables)
+                        )
                         {
-                            graph.Edges.Add(new GraphEdge
-                            {
-                                SourceId = graph.Nodes[i].Id,
-                                TargetId = graph.Nodes[j].Id,
-                                Type = "data"
-                            });
+                            graph.Edges.Add(
+                                new GraphEdge
+                                {
+                                    SourceId = graph.Nodes[i].Id,
+                                    TargetId = graph.Nodes[j].Id,
+                                    Type = "data",
+                                }
+                            );
                         }
                     }
                 }

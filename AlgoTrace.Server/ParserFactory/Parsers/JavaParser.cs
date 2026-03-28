@@ -17,7 +17,12 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
                 node.Type = UniversalNodeType.Class;
                 node.Value = Regex.Match(line, @"(?:class|interface)\s+(\w+)").Groups[1].Value;
             }
-            else if (Regex.IsMatch(line, @"(?:public|private|protected|static)\s+[\w<>,\[\]]+\s+(\w+)\s*\("))
+            else if (
+                Regex.IsMatch(
+                    line,
+                    @"(?:public|private|protected|static)\s+[\w<>,\[\]]+\s+(\w+)\s*\("
+                )
+            )
             {
                 node.Type = UniversalNodeType.Method;
                 node.Value = Regex.Match(line, @"\s+(\w+)\s*\(").Groups[1].Value;
@@ -30,7 +35,11 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
                 node.Type = UniversalNodeType.Switch;
             else if (line.StartsWith("return "))
                 node.Type = UniversalNodeType.Return;
-            else if (line.StartsWith("try") || line.StartsWith("catch") || line.StartsWith("finally"))
+            else if (
+                line.StartsWith("try")
+                || line.StartsWith("catch")
+                || line.StartsWith("finally")
+            )
                 node.Type = UniversalNodeType.TryCatch;
             else if (line.Contains("=") && !line.Contains("=="))
                 node.Type = UniversalNodeType.Assignment;

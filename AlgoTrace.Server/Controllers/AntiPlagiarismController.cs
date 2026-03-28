@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -8,7 +9,6 @@ using AlgoTrace.Server.Models.DTO.Analysis;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System;
 
 namespace AlgoTrace.Server.Controllers
 {
@@ -106,7 +106,11 @@ namespace AlgoTrace.Server.Controllers
                         var errorMessage = $"Неверный формат идентификатора документа: {docId}";
                         _logger.LogWarning(errorMessage);
                         multiResponse.Results.Add(
-                            new DocumentComparisonResult { DocumentId = docId, Error = errorMessage, }
+                            new DocumentComparisonResult
+                            {
+                                DocumentId = docId,
+                                Error = errorMessage,
+                            }
                         );
                         continue;
                     }
@@ -120,7 +124,11 @@ namespace AlgoTrace.Server.Controllers
                         var errorMessage = $"Документ с ID {docId} не найден в базе данных.";
                         _logger.LogWarning(errorMessage);
                         multiResponse.Results.Add(
-                            new DocumentComparisonResult { DocumentId = docId, Error = errorMessage, }
+                            new DocumentComparisonResult
+                            {
+                                DocumentId = docId,
+                                Error = errorMessage,
+                            }
                         );
                         continue;
                     }
@@ -134,7 +142,11 @@ namespace AlgoTrace.Server.Controllers
                             $"Файл документа отсутствует на диске. Путь: {fullFilePath}";
                         _logger.LogError(errorMessage);
                         multiResponse.Results.Add(
-                            new DocumentComparisonResult { DocumentId = docId, Error = errorMessage, }
+                            new DocumentComparisonResult
+                            {
+                                DocumentId = docId,
+                                Error = errorMessage,
+                            }
                         );
                         continue;
                     }
@@ -149,7 +161,11 @@ namespace AlgoTrace.Server.Controllers
                         {
                             Files = new List<CodeFile>
                             {
-                                new CodeFile { Filename = targetFile.Name, Content = targetContent },
+                                new CodeFile
+                                {
+                                    Filename = targetFile.Name,
+                                    Content = targetContent,
+                                },
                             },
                         },
                         AnalysisConfig = new UnifiedConfig
@@ -184,7 +200,7 @@ namespace AlgoTrace.Server.Controllers
                         new DocumentComparisonResult
                         {
                             DocumentId = docId,
-                            Error = $"{errorMessage} Детали: {ex.Message}"
+                            Error = $"{errorMessage} Детали: {ex.Message}",
                         }
                     );
                 }
@@ -194,4 +210,3 @@ namespace AlgoTrace.Server.Controllers
         }
     }
 }
-                

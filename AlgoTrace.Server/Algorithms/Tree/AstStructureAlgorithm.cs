@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO;
 using AlgoTrace.Server.Models.DTO.Analysis;
 using AlgoTrace.Server.Models.Tree;
 using AlgoTrace.Server.Utils;
-using System.Text.Json;
 
 namespace AlgoTrace.Server.Algorithms.Tree
 {
@@ -14,7 +14,12 @@ namespace AlgoTrace.Server.Algorithms.Tree
     {
         public string Key => "ast_compare";
 
-        public double Calculate(UniversalNode treeA, UniversalNode treeB, Dictionary<string, object> parameters, out object outMatches)
+        public double Calculate(
+            UniversalNode treeA,
+            UniversalNode treeB,
+            Dictionary<string, object> parameters,
+            out object outMatches
+        )
         {
             var evidence = new TreeEvidence();
             outMatches = evidence;
@@ -22,9 +27,16 @@ namespace AlgoTrace.Server.Algorithms.Tree
             bool ignoreWhitespace = true;
             if (parameters != null && parameters.TryGetValue("ignore_whitespace", out var wVal))
             {
-                if (wVal is JsonElement elem && (elem.ValueKind == JsonValueKind.True || elem.ValueKind == JsonValueKind.False))
+                if (
+                    wVal is JsonElement elem
+                    && (
+                        elem.ValueKind == JsonValueKind.True
+                        || elem.ValueKind == JsonValueKind.False
+                    )
+                )
                     ignoreWhitespace = elem.GetBoolean();
-                else if (wVal is bool b) ignoreWhitespace = b;
+                else if (wVal is bool b)
+                    ignoreWhitespace = b;
             }
 
             if (treeA == null || treeB == null)
@@ -32,7 +44,8 @@ namespace AlgoTrace.Server.Algorithms.Tree
 
             // 3. Честная математика: Считаем только размер файла А
             int totalNodesA = GetSubtreeSize(treeA);
-            if (totalNodesA == 0) return 0;
+            if (totalNodesA == 0)
+                return 0;
 
             var matchedNodesB = new HashSet<UniversalNode>();
             int matchedNodesCount = 0;
@@ -56,12 +69,18 @@ namespace AlgoTrace.Server.Algorithms.Tree
                     var subtreeNodesB = new List<UniversalNode>();
                     CollectSubtreeNodes(matchB, subtreeNodesB);
 
-                    evidence.MatchedSubtrees.Add(new MatchedSubtree
-                    {
-                        NodeType = nodeA.Type,
-                        NodesA = subtreeNodesA.Select<UniversalNode, MatchedNodeInfo>(n => CreateNodeInfo(n, "a")).ToList(),
-                        NodesB = subtreeNodesB.Select<UniversalNode, MatchedNodeInfo>(n => CreateNodeInfo(n, "b")).ToList(),
-                    });
+                    evidence.MatchedSubtrees.Add(
+                        new MatchedSubtree
+                        {
+                            NodeType = nodeA.Type,
+                            NodesA = subtreeNodesA
+                                .Select<UniversalNode, MatchedNodeInfo>(n => CreateNodeInfo(n, "a"))
+                                .ToList(),
+                            NodesB = subtreeNodesB
+                                .Select<UniversalNode, MatchedNodeInfo>(n => CreateNodeInfo(n, "b"))
+                                .ToList(),
+                        }
+                    );
 
                     // Важно: мы НЕ идем вглубь nodeA, так как все его поддерево уже найдено целиком!
                 }
@@ -81,9 +100,15 @@ namespace AlgoTrace.Server.Algorithms.Tree
             return Math.Round(Math.Min(100.0, score), 2);
         }
 
-        private UniversalNode FindMatchInB(UniversalNode nodeA, UniversalNode currentB, HashSet<UniversalNode> matchedB, bool ignoreWhitespace)
+        private UniversalNode FindMatchInB(
+            UniversalNode nodeA,
+            UniversalNode currentB,
+            HashSet<UniversalNode> matchedB,
+            bool ignoreWhitespace
+        )
         {
-            if (currentB == null || matchedB.Contains(currentB)) return null;
+            if (currentB == null || matchedB.Contains(currentB))
+                return null;
 
             if (AreNodesStructurallyEqual(nodeA, currentB, matchedB, ignoreWhitespace))
                 return currentB;
@@ -91,7 +116,8 @@ namespace AlgoTrace.Server.Algorithms.Tree
             foreach (var childB in currentB.Children)
             {
                 var match = FindMatchInB(nodeA, childB, matchedB, ignoreWhitespace);
-                if (match != null) return match;
+                if (match != null)
+                    return match;
             }
 
             return null;
@@ -104,15 +130,23 @@ namespace AlgoTrace.Server.Algorithms.Tree
                 Id = $"{submissionPrefix}_{node.GetHashCode()}",
                 Label = node.Type,
                 Children = node
-                    .Children.Select<UniversalNode, string>(c => $"{submissionPrefix}_{c.GetHashCode()}")
+                    .Children.Select<UniversalNode, string>(c =>
+                        $"{submissionPrefix}_{c.GetHashCode()}"
+                    )
                     .ToList(),
                 Location = node.Location ?? new CodeLocation(), // Handle null location
             };
         }
 
-        private bool AreNodesStructurallyEqual(UniversalNode a, UniversalNode b, HashSet<UniversalNode> matchedB, bool ignoreWhitespace)
+        private bool AreNodesStructurallyEqual(
+            UniversalNode a,
+            UniversalNode b,
+            HashSet<UniversalNode> matchedB,
+            bool ignoreWhitespace
+        )
         {
-            if (matchedB.Contains(b)) return false;
+            if (matchedB.Contains(b))
+                return false;
             if (a.Type != b.Type || a.Children.Count != b.Children.Count)
                 return false;
 
@@ -121,14 +155,26 @@ namespace AlgoTrace.Server.Algorithms.Tree
             bool hasValueB = !string.IsNullOrWhiteSpace(b.Value);
             if (hasValueA || hasValueB)
             {
-                var valA = ignoreWhitespace ? SourceNormalizer.NormalizeLine(a.Value, true) : a.Value;
-                var valB = ignoreWhitespace ? SourceNormalizer.NormalizeLine(b.Value, true) : b.Value;
-                if (valA != valB) return false;
+                var valA = ignoreWhitespace
+                    ? SourceNormalizer.NormalizeLine(a.Value, true)
+                    : a.Value;
+                var valB = ignoreWhitespace
+                    ? SourceNormalizer.NormalizeLine(b.Value, true)
+                    : b.Value;
+                if (valA != valB)
+                    return false;
             }
 
             for (int i = 0; i < a.Children.Count; i++)
             {
-                if (!AreNodesStructurallyEqual(a.Children[i], b.Children[i], matchedB, ignoreWhitespace))
+                if (
+                    !AreNodesStructurallyEqual(
+                        a.Children[i],
+                        b.Children[i],
+                        matchedB,
+                        ignoreWhitespace
+                    )
+                )
                     return false;
             }
             return true;
@@ -136,24 +182,30 @@ namespace AlgoTrace.Server.Algorithms.Tree
 
         private int GetSubtreeSize(UniversalNode node)
         {
-            if (node == null) return 0;
+            if (node == null)
+                return 0;
             int size = 1;
-            foreach (var child in node.Children) size += GetSubtreeSize(child);
+            foreach (var child in node.Children)
+                size += GetSubtreeSize(child);
             return size;
         }
 
         private void MarkSubtreeAsMatched(UniversalNode node, HashSet<UniversalNode> matchedB)
         {
-            if (node == null) return;
+            if (node == null)
+                return;
             matchedB.Add(node);
-            foreach (var child in node.Children) MarkSubtreeAsMatched(child, matchedB);
+            foreach (var child in node.Children)
+                MarkSubtreeAsMatched(child, matchedB);
         }
 
         private void CollectSubtreeNodes(UniversalNode node, List<UniversalNode> list)
         {
-            if (node == null) return;
+            if (node == null)
+                return;
             list.Add(node);
-            foreach (var child in node.Children) CollectSubtreeNodes(child, list);
+            foreach (var child in node.Children)
+                CollectSubtreeNodes(child, list);
         }
     }
 }

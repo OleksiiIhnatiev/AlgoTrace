@@ -1,4 +1,4 @@
-﻿﻿using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.Tree;
 
@@ -17,15 +17,14 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
             foreach (var stmt in statements)
             {
                 var trimmed = stmt.Trim();
-                if (string.IsNullOrWhiteSpace(trimmed)) continue;
+                if (string.IsNullOrWhiteSpace(trimmed))
+                    continue;
 
                 var firstWord = trimmed.Split(' ').FirstOrDefault()?.ToUpper();
 
-                root.Children.Add(new UniversalNode
-                {
-                    Type = "Statement",
-                    Value = firstWord ?? "QUERY"
-                });
+                root.Children.Add(
+                    new UniversalNode { Type = "Statement", Value = firstWord ?? "QUERY" }
+                );
             }
             return root;
         }
@@ -33,11 +32,17 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
         private string SanitizeSqlCode(string code)
         {
             var pattern = @"(""(?:\\.|[^\\""])*""|'(?:\\.|[^\\'])*'|--.*?$|/\*[\s\S]*?\*/)";
-            return Regex.Replace(code, pattern, match =>
-            {
-                if (match.Value.StartsWith("--") || match.Value.StartsWith("/*")) return "";
-                return "'STR'";
-            }, RegexOptions.Multiline);
+            return Regex.Replace(
+                code,
+                pattern,
+                match =>
+                {
+                    if (match.Value.StartsWith("--") || match.Value.StartsWith("/*"))
+                        return "";
+                    return "'STR'";
+                },
+                RegexOptions.Multiline
+            );
         }
     }
 }

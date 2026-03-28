@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO.Analysis;
 using AlgoTrace.Server.Models.Tree;
 using AlgoTrace.Server.Utils;
-using System.Text.Json;
 
 namespace AlgoTrace.Server.Algorithms.Tree
 {
@@ -13,14 +13,26 @@ namespace AlgoTrace.Server.Algorithms.Tree
     {
         public string Key => "ast_hashing";
 
-        public double Calculate(UniversalNode treeA, UniversalNode treeB, Dictionary<string, object> parameters, out object outMatches)
+        public double Calculate(
+            UniversalNode treeA,
+            UniversalNode treeB,
+            Dictionary<string, object> parameters,
+            out object outMatches
+        )
         {
             bool ignoreWhitespace = true;
             if (parameters != null && parameters.TryGetValue("ignore_whitespace", out var wVal))
             {
-                if (wVal is JsonElement elem && (elem.ValueKind == JsonValueKind.True || elem.ValueKind == JsonValueKind.False))
+                if (
+                    wVal is JsonElement elem
+                    && (
+                        elem.ValueKind == JsonValueKind.True
+                        || elem.ValueKind == JsonValueKind.False
+                    )
+                )
                     ignoreWhitespace = elem.GetBoolean();
-                else if (wVal is bool b) ignoreWhitespace = b;
+                else if (wVal is bool b)
+                    ignoreWhitespace = b;
             }
 
             // 3. Сохранять хеши только тех поддеревьев, размер которых >= 3 узлов.
@@ -28,23 +40,31 @@ namespace AlgoTrace.Server.Algorithms.Tree
 
             // 4. Сбор данных для дерева А
             var hashesA = new Dictionary<int, UniversalNode>();
-            ProcessNode(treeA, ignoreWhitespace, (hash, node, size) =>
-            {
-                if (size >= minSubtreeSize)
+            ProcessNode(
+                treeA,
+                ignoreWhitespace,
+                (hash, node, size) =>
                 {
-                    hashesA.TryAdd(hash, node);
+                    if (size >= minSubtreeSize)
+                    {
+                        hashesA.TryAdd(hash, node);
+                    }
                 }
-            });
+            );
 
             // 4. Сбор данных для дерева B
             var hashesB = new HashSet<int>();
-            ProcessNode(treeB, ignoreWhitespace, (hash, node, size) =>
-            {
-                if (size >= minSubtreeSize)
+            ProcessNode(
+                treeB,
+                ignoreWhitespace,
+                (hash, node, size) =>
                 {
-                    hashesB.Add(hash);
+                    if (size >= minSubtreeSize)
+                    {
+                        hashesB.Add(hash);
+                    }
                 }
-            });
+            );
 
             // 5. Математика совпадений
             int matchCount = 0;
@@ -56,13 +76,15 @@ namespace AlgoTrace.Server.Algorithms.Tree
                 {
                     matchCount++;
                     var matchedNodeA = kvp.Value;
-                    matches.Add(new DetailedMatch
-                    {
-                        Type = "Identical Subtree Found",
-                        Severity = "high",
-                        LeftLines = GetLineRange(matchedNodeA),
-                        RightLines = new List<int>() // Невозможно определить соответствующие строки в B
-                    });
+                    matches.Add(
+                        new DetailedMatch
+                        {
+                            Type = "Identical Subtree Found",
+                            Severity = "high",
+                            LeftLines = GetLineRange(matchedNodeA),
+                            RightLines = new List<int>(), // Невозможно определить соответствующие строки в B
+                        }
+                    );
                 }
             }
 
@@ -79,14 +101,20 @@ namespace AlgoTrace.Server.Algorithms.Tree
         }
 
         // 1. Рекурсивный обход
-        private (int hash, int size) ProcessNode(UniversalNode node, bool ignoreWhitespace, Action<int, UniversalNode, int> onHashCalculated)
+        private (int hash, int size) ProcessNode(
+            UniversalNode node,
+            bool ignoreWhitespace,
+            Action<int, UniversalNode, int> onHashCalculated
+        )
         {
             var hash = new HashCode();
             // 2. Точность контента
             hash.Add(node.Type);
             if (!string.IsNullOrWhiteSpace(node.Value))
             {
-                hash.Add(ignoreWhitespace ? SourceNormalizer.NormalizeLine(node.Value, true) : node.Value);
+                hash.Add(
+                    ignoreWhitespace ? SourceNormalizer.NormalizeLine(node.Value, true) : node.Value
+                );
             }
 
             int subtreeSize = 1; // Считаем текущий узел
@@ -105,7 +133,8 @@ namespace AlgoTrace.Server.Algorithms.Tree
 
         private List<int> GetLineRange(UniversalNode node)
         {
-            if (node == null) return new List<int>();
+            if (node == null)
+                return new List<int>();
 
             var allNodes = node.Flatten();
             int minLine = int.MaxValue;
@@ -117,7 +146,10 @@ namespace AlgoTrace.Server.Algorithms.Tree
                 if (n.Location != null && n.Location.StartLine > 0)
                 {
                     minLine = Math.Min(minLine, n.Location.StartLine);
-                    maxLine = Math.Max(maxLine, n.Location.EndLine > 0 ? n.Location.EndLine : n.Location.StartLine);
+                    maxLine = Math.Max(
+                        maxLine,
+                        n.Location.EndLine > 0 ? n.Location.EndLine : n.Location.StartLine
+                    );
                     foundLines = true;
                 }
             }

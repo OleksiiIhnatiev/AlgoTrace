@@ -1,4 +1,4 @@
-﻿﻿﻿﻿using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.Tree;
 
@@ -33,7 +33,8 @@ namespace AlgoTrace.Server.ParserFactory.Parsers.Base
                 {
                     stack.Pop();
                     trimmed = trimmed.Substring(1).Trim();
-                    if (string.IsNullOrEmpty(trimmed)) continue;
+                    if (string.IsNullOrEmpty(trimmed))
+                        continue;
                 }
 
                 var node = IdentifyNode(trimmed);
@@ -45,8 +46,12 @@ namespace AlgoTrace.Server.ParserFactory.Parsers.Base
 
                 if (trimmed.EndsWith("{") || trimmed.Contains("{"))
                 {
-                    var blockNode = node.Type != UniversalNodeType.Unknown ? node : new UniversalNode { Type = "Block" };
-                    if (node.Type == UniversalNodeType.Unknown) stack.Peek().Children.Add(blockNode);
+                    var blockNode =
+                        node.Type != UniversalNodeType.Unknown
+                            ? node
+                            : new UniversalNode { Type = "Block" };
+                    if (node.Type == UniversalNodeType.Unknown)
+                        stack.Peek().Children.Add(blockNode);
                     stack.Push(blockNode);
                 }
             }
@@ -57,15 +62,27 @@ namespace AlgoTrace.Server.ParserFactory.Parsers.Base
         protected virtual string SanitizeCode(string code, bool ignoreComments)
         {
             // Безопасно удаляем комментарии и содержимое строк, не ломая структуру
-            var pattern = @"(@""(?:[^""]|"""")*""|""(?:\\.|[^\\""])*""|'(?:\\.|[^\\'])*'|`(?:\\.|[^\\`])*`|//.*?$|/\*[\s\S]*?\*/)";
-            return Regex.Replace(code, pattern, match =>
-            {
-                if (ignoreComments && (match.Value.StartsWith("//") || match.Value.StartsWith("/*")))
-                    return new string('\n', match.Value.Count(c => c == '\n')); // Сохраняем переносы строк
-                if (!ignoreComments && (match.Value.StartsWith("//") || match.Value.StartsWith("/*")))
-                    return match.Value; // Оставляем комментарии, если настройка игнорирования выключена
-                return "\"STR\""; // Заменяем строки на плейсхолдер
-            }, RegexOptions.Multiline);
+            var pattern =
+                @"(@""(?:[^""]|"""")*""|""(?:\\.|[^\\""])*""|'(?:\\.|[^\\'])*'|`(?:\\.|[^\\`])*`|//.*?$|/\*[\s\S]*?\*/)";
+            return Regex.Replace(
+                code,
+                pattern,
+                match =>
+                {
+                    if (
+                        ignoreComments
+                        && (match.Value.StartsWith("//") || match.Value.StartsWith("/*"))
+                    )
+                        return new string('\n', match.Value.Count(c => c == '\n')); // Сохраняем переносы строк
+                    if (
+                        !ignoreComments
+                        && (match.Value.StartsWith("//") || match.Value.StartsWith("/*"))
+                    )
+                        return match.Value; // Оставляем комментарии, если настройка игнорирования выключена
+                    return "\"STR\""; // Заменяем строки на плейсхолдер
+                },
+                RegexOptions.Multiline
+            );
         }
 
         protected abstract UniversalNode IdentifyNode(string line);

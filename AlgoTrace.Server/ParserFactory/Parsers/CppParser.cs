@@ -17,7 +17,10 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
                 node.Type = UniversalNodeType.Class;
                 node.Value = Regex.Match(line, @"(?:class|struct)\s+(\w+)").Groups[1].Value;
             }
-            else if (Regex.IsMatch(line, @"^\s*(?:virtual|inline|static)?\s*[\w:]+[\*\&]?\s+(\w+)\s*\(") && !line.Contains("="))
+            else if (
+                Regex.IsMatch(line, @"^\s*(?:virtual|inline|static)?\s*[\w:]+[\*\&]?\s+(\w+)\s*\(")
+                && !line.Contains("=")
+            )
             {
                 node.Type = UniversalNodeType.Method;
                 node.Value = Regex.Match(line, @"(\w+)\s*\(").Groups[1].Value;

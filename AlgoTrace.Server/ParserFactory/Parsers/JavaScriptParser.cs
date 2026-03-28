@@ -22,20 +22,34 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
                 node.Type = UniversalNodeType.Method;
                 node.Value = Regex.Match(line, @"function\s+(\w+)").Groups[1].Value;
             }
-            else if (line.Contains("=>") && (line.Contains("const") || line.Contains("let") || line.Contains("var")))
+            else if (
+                line.Contains("=>")
+                && (line.Contains("const") || line.Contains("let") || line.Contains("var"))
+            )
             {
                 node.Type = UniversalNodeType.Method;
                 node.Value = Regex.Match(line, @"(?:const|let|var)\s+(\w+)").Groups[1].Value;
             }
             else if (line.StartsWith("if") || line.StartsWith("else"))
                 node.Type = UniversalNodeType.If;
-            else if (line.StartsWith("for") || line.StartsWith("while") || line.Contains(".forEach("))
+            else if (
+                line.StartsWith("for")
+                || line.StartsWith("while")
+                || line.Contains(".forEach(")
+            )
                 node.Type = UniversalNodeType.Loop;
             else if (line.StartsWith("return "))
                 node.Type = UniversalNodeType.Return;
-            else if (line.StartsWith("try") || line.StartsWith("catch") || line.StartsWith("finally"))
+            else if (
+                line.StartsWith("try")
+                || line.StartsWith("catch")
+                || line.StartsWith("finally")
+            )
                 node.Type = UniversalNodeType.TryCatch;
-            else if ((line.Contains("const ") || line.Contains("let ") || line.Contains("var ")) && line.Contains("="))
+            else if (
+                (line.Contains("const ") || line.Contains("let ") || line.Contains("var "))
+                && line.Contains("=")
+            )
                 node.Type = UniversalNodeType.VariableDecl;
             else if (line.Contains("=") && !line.Contains("=="))
                 node.Type = UniversalNodeType.Assignment;

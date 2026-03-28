@@ -1,9 +1,9 @@
-using AlgoTrace.Server.Interfaces;
-using AlgoTrace.Server.Models.DTO.Analysis;
-using AlgoTrace.Server.Models.Tree;
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
+using AlgoTrace.Server.Interfaces;
+using AlgoTrace.Server.Models.DTO.Analysis;
+using AlgoTrace.Server.Models.Tree;
 using AlgoTrace.Server.Utils;
 using static AlgoTrace.Server.Algorithms.Graph.GraphUtils;
 
@@ -32,12 +32,20 @@ namespace AlgoTrace.Server.Algorithms.Graph
             bool ignoreWhitespace = true;
             if (parameters != null && parameters.TryGetValue("ignore_whitespace", out var wVal))
             {
-                if (wVal is JsonElement elem && (elem.ValueKind == JsonValueKind.True || elem.ValueKind == JsonValueKind.False))
+                if (
+                    wVal is JsonElement elem
+                    && (
+                        elem.ValueKind == JsonValueKind.True
+                        || elem.ValueKind == JsonValueKind.False
+                    )
+                )
                     ignoreWhitespace = elem.GetBoolean();
-                else if (wVal is bool b) ignoreWhitespace = b;
+                else if (wVal is bool b)
+                    ignoreWhitespace = b;
             }
 
-            if (graphA.Nodes.Count == 0 || graphB.Nodes.Count == 0) return matches;
+            if (graphA.Nodes.Count == 0 || graphB.Nodes.Count == 0)
+                return matches;
 
             int countA = graphA.Nodes.Count;
             int countB = graphB.Nodes.Count;
@@ -54,8 +62,12 @@ namespace AlgoTrace.Server.Algorithms.Graph
                     var nodeA = graphA.Nodes[i - 1];
                     var nodeB = graphB.Nodes[j - 1];
 
-                    var contentA = ignoreWhitespace ? SourceNormalizer.NormalizeLine(nodeA.Content, true) : nodeA.Content;
-                    var contentB = ignoreWhitespace ? SourceNormalizer.NormalizeLine(nodeB.Content, true) : nodeB.Content;
+                    var contentA = ignoreWhitespace
+                        ? SourceNormalizer.NormalizeLine(nodeA.Content, true)
+                        : nodeA.Content;
+                    var contentB = ignoreWhitespace
+                        ? SourceNormalizer.NormalizeLine(nodeB.Content, true)
+                        : nodeB.Content;
 
                     if (nodeA.Type == nodeB.Type && contentA == contentB)
                     {
@@ -79,22 +91,28 @@ namespace AlgoTrace.Server.Algorithms.Graph
                 var nodeA = graphA.Nodes[x - 1];
                 var nodeB = graphB.Nodes[y - 1];
 
-                var contentA = ignoreWhitespace ? SourceNormalizer.NormalizeLine(nodeA.Content, true) : nodeA.Content;
-                var contentB = ignoreWhitespace ? SourceNormalizer.NormalizeLine(nodeB.Content, true) : nodeB.Content;
+                var contentA = ignoreWhitespace
+                    ? SourceNormalizer.NormalizeLine(nodeA.Content, true)
+                    : nodeA.Content;
+                var contentB = ignoreWhitespace
+                    ? SourceNormalizer.NormalizeLine(nodeB.Content, true)
+                    : nodeB.Content;
 
                 if (nodeA.Type == nodeB.Type && contentA == contentB)
                 {
                     // Сохраняем маппинг для проверки ребер
                     mappedNodesAtoB[nodeA.Id] = nodeB.Id;
 
-                    matches.Add(new DetailedMatch
-                    {
-                        Id = nodeA.Id + 1000,
-                        Type = "CFG Node Match",
-                        LeftLines = new List<int> { nodeA.LineIndex + 1, nodeA.LineIndex + 1 },
-                        RightLines = new List<int> { nodeB.LineIndex + 1, nodeB.LineIndex + 1 },
-                        Severity = "med",
-                    });
+                    matches.Add(
+                        new DetailedMatch
+                        {
+                            Id = nodeA.Id + 1000,
+                            Type = "CFG Node Match",
+                            LeftLines = new List<int> { nodeA.LineIndex + 1, nodeA.LineIndex + 1 },
+                            RightLines = new List<int> { nodeB.LineIndex + 1, nodeB.LineIndex + 1 },
+                            Severity = "med",
+                        }
+                    );
                     x--;
                     y--;
                 }
@@ -110,7 +128,6 @@ namespace AlgoTrace.Server.Algorithms.Graph
 
             matches.Reverse();
             int matchedNodesCount = mappedNodesAtoB.Count;
-
 
             // ==========================================
             // ШАГ 2: Проверка топологии графа (Edges)
@@ -129,8 +146,10 @@ namespace AlgoTrace.Server.Algorithms.Graph
             foreach (var edgeA in graphA.Edges)
             {
                 // Если оба узла этого ребра имеют совпадения в файле B...
-                if (mappedNodesAtoB.TryGetValue(edgeA.SourceId, out int mappedSourceB) &&
-                    mappedNodesAtoB.TryGetValue(edgeA.TargetId, out int mappedTargetB))
+                if (
+                    mappedNodesAtoB.TryGetValue(edgeA.SourceId, out int mappedSourceB)
+                    && mappedNodesAtoB.TryGetValue(edgeA.TargetId, out int mappedTargetB)
+                )
                 {
                     // Проверяем, существует ли в файле B точно такая же связь между этими узлами
                     string expectedEdgeSignatureB = $"{mappedSourceB}_{mappedTargetB}_{edgeA.Type}";
@@ -141,7 +160,6 @@ namespace AlgoTrace.Server.Algorithms.Graph
                     }
                 }
             }
-
 
             // ==========================================
             // ШАГ 3: Итоговый расчет 100% честного CFG

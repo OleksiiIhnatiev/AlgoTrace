@@ -1,9 +1,9 @@
-﻿using AlgoTrace.Server.Interfaces;
+﻿using System.Security.Claims;
+using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO.Directory;
 using AlgoTrace.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 
 namespace AlgoTrace.Server.Controllers
 {
@@ -72,14 +72,21 @@ namespace AlgoTrace.Server.Controllers
         #region File Operations
 
         [HttpPost("file/upload")]
-        public async Task<IActionResult> UploadFiles([FromForm] List<IFormFile> files, [FromQuery] Guid? folderId)
+        public async Task<IActionResult> UploadFiles(
+            [FromForm] List<IFormFile> files,
+            [FromQuery] Guid? folderId
+        )
         {
             if (files == null || files.Count == 0)
             {
                 return BadRequest("Не вибрано жодного файлу для завантаження.");
             }
 
-            var fileEntries = await _directoryService.UploadFilesAsync(files, folderId, GetUserId());
+            var fileEntries = await _directoryService.UploadFilesAsync(
+                files,
+                folderId,
+                GetUserId()
+            );
             return Ok(fileEntries);
         }
 

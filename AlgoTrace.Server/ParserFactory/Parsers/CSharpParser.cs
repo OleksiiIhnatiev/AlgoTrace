@@ -1,8 +1,8 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using AlgoTrace.Server.Interfaces;
+using AlgoTrace.Server.Models.Tree;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using AlgoTrace.Server.Interfaces;
-using AlgoTrace.Server.Models.Tree;
 
 namespace AlgoTrace.Server.ParserFactory.Parsers
 {
@@ -23,7 +23,7 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
             {
                 Type = MapKind(node.Kind()),
                 Value = GetNodeValue(node),
-                Children = node.ChildNodes().Select(MapToUniversal).ToList()
+                Children = node.ChildNodes().Select(MapToUniversal).ToList(),
             };
         }
 
@@ -51,28 +51,37 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
                 SyntaxKind.SimpleAssignmentExpression => UniversalNodeType.Assignment,
                 SyntaxKind.InvocationExpression => UniversalNodeType.MethodCall,
 
-                SyntaxKind.AddExpression or SyntaxKind.SubtractExpression or
-                SyntaxKind.MultiplyExpression or SyntaxKind.DivideExpression or
-                SyntaxKind.EqualsExpression or SyntaxKind.NotEqualsExpression or
-                SyntaxKind.LogicalAndExpression or SyntaxKind.LogicalOrExpression
-                    => UniversalNodeType.BinaryOperation,
+                SyntaxKind.AddExpression
+                or SyntaxKind.SubtractExpression
+                or SyntaxKind.MultiplyExpression
+                or SyntaxKind.DivideExpression
+                or SyntaxKind.EqualsExpression
+                or SyntaxKind.NotEqualsExpression
+                or SyntaxKind.LogicalAndExpression
+                or SyntaxKind.LogicalOrExpression => UniversalNodeType.BinaryOperation,
 
                 SyntaxKind.IdentifierName => UniversalNodeType.Identifier,
-                SyntaxKind.StringLiteralExpression or SyntaxKind.NumericLiteralExpression
-                    => UniversalNodeType.Literal,
+                SyntaxKind.StringLiteralExpression or SyntaxKind.NumericLiteralExpression =>
+                    UniversalNodeType.Literal,
 
-                _ => kind.ToString()
+                _ => kind.ToString(),
             };
         }
 
         private string GetNodeValue(SyntaxNode node)
         {
-            if (node is MethodDeclarationSyntax method) return method.Identifier.Text;
-            if (node is VariableDeclaratorSyntax variable) return variable.Identifier.Text;
-            if (node is ClassDeclarationSyntax classDecl) return classDecl.Identifier.Text;
-            if (node is IdentifierNameSyntax id) return id.Identifier.Text;
-            if (node is LiteralExpressionSyntax literal) return literal.Token.ValueText;
-            if (node is BinaryExpressionSyntax binary) return binary.OperatorToken.Text;
+            if (node is MethodDeclarationSyntax method)
+                return method.Identifier.Text;
+            if (node is VariableDeclaratorSyntax variable)
+                return variable.Identifier.Text;
+            if (node is ClassDeclarationSyntax classDecl)
+                return classDecl.Identifier.Text;
+            if (node is IdentifierNameSyntax id)
+                return id.Identifier.Text;
+            if (node is LiteralExpressionSyntax literal)
+                return literal.Token.ValueText;
+            if (node is BinaryExpressionSyntax binary)
+                return binary.OperatorToken.Text;
             return string.Empty;
         }
     }

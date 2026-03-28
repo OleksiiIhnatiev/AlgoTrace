@@ -1,4 +1,4 @@
-﻿﻿using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,7 +16,13 @@ namespace AlgoTrace.Server.Utils
                 var processed = line.ToLower();
                 if (ignoreWhitespace)
                 {
-                    processed = Regex.Replace(processed, @"\s+", "", RegexOptions.None, TimeSpan.FromSeconds(1));
+                    processed = Regex.Replace(
+                        processed,
+                        @"\s+",
+                        "",
+                        RegexOptions.None,
+                        TimeSpan.FromSeconds(1)
+                    );
                 }
                 return processed;
             }

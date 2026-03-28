@@ -12,12 +12,16 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
         {
             var node = new UniversalNode { Type = UniversalNodeType.Unknown, Value = "" };
 
-            if (line.Contains("<?php")) return node;
+            if (line.Contains("<?php"))
+                return node;
 
             if (line.Contains("class ") || line.Contains("interface ") || line.Contains("trait "))
             {
                 node.Type = UniversalNodeType.Class;
-                node.Value = Regex.Match(line, @"(?:class|interface|trait)\s+(\w+)").Groups[1].Value;
+                node.Value = Regex
+                    .Match(line, @"(?:class|interface|trait)\s+(\w+)")
+                    .Groups[1]
+                    .Value;
             }
             else if (Regex.IsMatch(line, @"function\s+(\w+)\s*\("))
             {
@@ -26,11 +30,20 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
             }
             else if (line.StartsWith("if") || line.StartsWith("else") || line.StartsWith("elseif"))
                 node.Type = UniversalNodeType.If;
-            else if (line.StartsWith("for") || line.StartsWith("while") || line.StartsWith("foreach") || line.StartsWith("do "))
+            else if (
+                line.StartsWith("for")
+                || line.StartsWith("while")
+                || line.StartsWith("foreach")
+                || line.StartsWith("do ")
+            )
                 node.Type = UniversalNodeType.Loop;
             else if (line.StartsWith("return "))
                 node.Type = UniversalNodeType.Return;
-            else if (line.StartsWith("try") || line.StartsWith("catch") || line.StartsWith("finally"))
+            else if (
+                line.StartsWith("try")
+                || line.StartsWith("catch")
+                || line.StartsWith("finally")
+            )
                 node.Type = UniversalNodeType.TryCatch;
             else if (line.Contains("$") && line.Contains("=") && !line.Contains("=="))
             {

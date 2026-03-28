@@ -22,12 +22,22 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
                 node.Type = UniversalNodeType.Method;
                 node.Value = Regex.Match(line, @"fn\s+(\w+)\s*\(").Groups[1].Value;
             }
-            else if (line.StartsWith("if ") || line.StartsWith("else ")) node.Type = UniversalNodeType.If;
-            else if (line.StartsWith("for ") || line.StartsWith("while ") || line.StartsWith("loop ")) node.Type = UniversalNodeType.Loop;
-            else if (line.StartsWith("match ")) node.Type = UniversalNodeType.Switch;
-            else if (line.StartsWith("return ")) node.Type = UniversalNodeType.Return;
-            else if (line.StartsWith("let ") && line.Contains("=")) node.Type = UniversalNodeType.VariableDecl;
-            else if (line.Contains("=") && !line.Contains("==")) node.Type = UniversalNodeType.Assignment;
+            else if (line.StartsWith("if ") || line.StartsWith("else "))
+                node.Type = UniversalNodeType.If;
+            else if (
+                line.StartsWith("for ")
+                || line.StartsWith("while ")
+                || line.StartsWith("loop ")
+            )
+                node.Type = UniversalNodeType.Loop;
+            else if (line.StartsWith("match "))
+                node.Type = UniversalNodeType.Switch;
+            else if (line.StartsWith("return "))
+                node.Type = UniversalNodeType.Return;
+            else if (line.StartsWith("let ") && line.Contains("="))
+                node.Type = UniversalNodeType.VariableDecl;
+            else if (line.Contains("=") && !line.Contains("=="))
+                node.Type = UniversalNodeType.Assignment;
 
             return node;
         }

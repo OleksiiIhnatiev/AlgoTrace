@@ -17,10 +17,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(connectionString));
+    options.UseSqlServer(connectionString)
+);
 
-builder.Services.AddIdentityApiEndpoints<User>()
-    .AddEntityFrameworkStores<ApplicationDbContext>();
+builder.Services.AddIdentityApiEndpoints<User>().AddEntityFrameworkStores<ApplicationDbContext>();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
@@ -83,7 +83,7 @@ using (var scope = app.Services.CreateScope())
         {
             dbContext.Database.Migrate();
             Console.WriteLine("Successfully connected to the database and applied migrations.");
-            break; 
+            break;
         }
         catch (Microsoft.Data.SqlClient.SqlException ex)
         {
@@ -93,7 +93,9 @@ using (var scope = app.Services.CreateScope())
                 throw;
             }
 
-            Console.WriteLine($"Database not ready yet. Retrying in 5 seconds... (Attempt {retry + 1} of {maxRetries})");
+            Console.WriteLine(
+                $"Database not ready yet. Retrying in 5 seconds... (Attempt {retry + 1} of {maxRetries})"
+            );
             Thread.Sleep(5000);
         }
     }

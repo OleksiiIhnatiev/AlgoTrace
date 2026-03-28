@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO;
 using AlgoTrace.Server.Models.DTO.Analysis;
 using AlgoTrace.Server.Models.Tree;
 using AlgoTrace.Server.Utils;
-using System.Text.Json;
 
 namespace AlgoTrace.Server.Algorithms.Tree
 {
@@ -13,7 +13,12 @@ namespace AlgoTrace.Server.Algorithms.Tree
     {
         public string Key => "subtree_isomorphism";
 
-        public double Calculate(UniversalNode treeA, UniversalNode treeB, Dictionary<string, object> parameters, out object outMatches)
+        public double Calculate(
+            UniversalNode treeA,
+            UniversalNode treeB,
+            Dictionary<string, object> parameters,
+            out object outMatches
+        )
         {
             var matches = new List<DetailedMatch>();
             outMatches = matches;
@@ -21,19 +26,20 @@ namespace AlgoTrace.Server.Algorithms.Tree
             bool ignoreWhitespace = true;
             if (parameters != null && parameters.TryGetValue("ignore_whitespace", out var wVal))
             {
-                if (wVal is JsonElement elem && (elem.ValueKind == JsonValueKind.True || elem.ValueKind == JsonValueKind.False))
+                if (
+                    wVal is JsonElement elem
+                    && (
+                        elem.ValueKind == JsonValueKind.True
+                        || elem.ValueKind == JsonValueKind.False
+                    )
+                )
                     ignoreWhitespace = elem.GetBoolean();
-                else if (wVal is bool b) ignoreWhitespace = b;
+                else if (wVal is bool b)
+                    ignoreWhitespace = b;
             }
 
-            var subtreesA = treeA
-                .Flatten()
-                .Where(IsSignificantSubtree)
-                .ToList();
-            var subtreesB = treeB
-                .Flatten()
-                .Where(IsSignificantSubtree)
-                .ToList();
+            var subtreesA = treeA.Flatten().Where(IsSignificantSubtree).ToList();
+            var subtreesB = treeB.Flatten().Where(IsSignificantSubtree).ToList();
 
             if (!subtreesA.Any())
                 return 0;
@@ -69,7 +75,11 @@ namespace AlgoTrace.Server.Algorithms.Tree
             return (double)matchedCount / subtreesA.Count * 100;
         }
 
-        private bool AreNodesStructurallyEqual(UniversalNode a, UniversalNode b, bool ignoreWhitespace)
+        private bool AreNodesStructurallyEqual(
+            UniversalNode a,
+            UniversalNode b,
+            bool ignoreWhitespace
+        )
         {
             if (a.Type != b.Type || a.Children.Count != b.Children.Count)
                 return false;
@@ -80,8 +90,12 @@ namespace AlgoTrace.Server.Algorithms.Tree
 
             if (hasValueA || hasValueB)
             {
-                var valA = ignoreWhitespace ? SourceNormalizer.NormalizeLine(a.Value, true) : a.Value;
-                var valB = ignoreWhitespace ? SourceNormalizer.NormalizeLine(b.Value, true) : b.Value;
+                var valA = ignoreWhitespace
+                    ? SourceNormalizer.NormalizeLine(a.Value, true)
+                    : a.Value;
+                var valB = ignoreWhitespace
+                    ? SourceNormalizer.NormalizeLine(b.Value, true)
+                    : b.Value;
                 if (valA != valB)
                     return false;
             }
@@ -97,13 +111,18 @@ namespace AlgoTrace.Server.Algorithms.Tree
         // 3. Расширенный фильтр логических блоков
         private bool IsSignificantSubtree(UniversalNode node)
         {
-            if (node.Children.Count == 0) return false;
+            if (node.Children.Count == 0)
+                return false;
 
-            return node.Type == UniversalNodeType.Program || node.Type == UniversalNodeType.Class ||
-                   node.Type == UniversalNodeType.Method || node.Type == UniversalNodeType.If ||
-                   node.Type == UniversalNodeType.Loop || node.Type == UniversalNodeType.Switch ||
-                   node.Type == UniversalNodeType.TryCatch || node.Type.Contains("Block") ||
-                   node.Type.Contains("Function");
+            return node.Type == UniversalNodeType.Program
+                || node.Type == UniversalNodeType.Class
+                || node.Type == UniversalNodeType.Method
+                || node.Type == UniversalNodeType.If
+                || node.Type == UniversalNodeType.Loop
+                || node.Type == UniversalNodeType.Switch
+                || node.Type == UniversalNodeType.TryCatch
+                || node.Type.Contains("Block")
+                || node.Type.Contains("Function");
         }
     }
 }

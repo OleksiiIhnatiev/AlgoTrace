@@ -145,7 +145,11 @@ namespace AlgoTrace.Server.Services
             }
         }
 
-        public async Task<IEnumerable<SourceFile>> UploadFilesAsync(IEnumerable<IFormFile> files, Guid? folderId, string userId)
+        public async Task<IEnumerable<SourceFile>> UploadFilesAsync(
+            IEnumerable<IFormFile> files,
+            Guid? folderId,
+            string userId
+        )
         {
             var uploadedFiles = new List<SourceFile>();
 

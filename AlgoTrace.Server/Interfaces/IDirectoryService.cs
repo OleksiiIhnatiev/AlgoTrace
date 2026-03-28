@@ -11,7 +11,11 @@ namespace AlgoTrace.Server.Interfaces
         Task<bool> RenameFolderAsync(Guid folderId, string newName, string userId);
         Task<bool> DeleteFolderAsync(Guid folderId, string userId);
 
-        Task<IEnumerable<SourceFile>> UploadFilesAsync(IEnumerable<IFormFile> files, Guid? folderId, string userId);
+        Task<IEnumerable<SourceFile>> UploadFilesAsync(
+            IEnumerable<IFormFile> files,
+            Guid? folderId,
+            string userId
+        );
         Task<FileDownloadResult?> DownloadFileAsync(Guid fileId, string userId);
         Task<bool> DeleteFileAsync(Guid fileId, string userId);
     }

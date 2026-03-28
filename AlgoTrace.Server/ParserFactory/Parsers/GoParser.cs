@@ -12,7 +12,8 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
         {
             var node = new UniversalNode { Type = UniversalNodeType.Unknown, Value = "" };
 
-            if (line.StartsWith("package ") || line.StartsWith("import ")) return node;
+            if (line.StartsWith("package ") || line.StartsWith("import "))
+                return node;
 
             if (line.StartsWith("type ") && line.Contains("struct"))
             {
