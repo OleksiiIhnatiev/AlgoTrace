@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+﻿﻿using System.Text.RegularExpressions;
 using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.Tree;
 
@@ -12,7 +12,7 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
         {
             var root = new UniversalNode { Type = "StyleSheet", Value = "CSS" };
 
-            code = Regex.Replace(code, @"/\*[\s\S]*?\*/", "");
+            code = SanitizeCssCode(code);
 
             var ruleRegex = new Regex(@"([^{]+)\{([^}]+)\}", RegexOptions.Compiled);
             var matches = ruleRegex.Matches(code);
@@ -48,6 +48,16 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
             }
 
             return root;
+        }
+
+        private string SanitizeCssCode(string code)
+        {
+            var pattern = @"(""(?:\\.|[^\\""])*""|'(?:\\.|[^\\'])*'|/\*[\s\S]*?\*/)";
+            return Regex.Replace(code, pattern, match =>
+            {
+                if (match.Value.StartsWith("/*")) return "";
+                return "\"STR\"";
+            }, RegexOptions.Multiline);
         }
     }
 }

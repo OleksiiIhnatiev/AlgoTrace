@@ -32,7 +32,7 @@ const ignoreWhitespace = ref(true);
 
 const languageOptions = [
   { group: 'C# / .NET', options: [ { value: 'csharp', label: 'C# (.cs)' } ] },
-  { group: 'Web (Frontend / Backend)', options: [ { value: 'typescript', label: 'TypeScript (.ts, .tsx)' }, { value: 'javascript', label: 'JavaScript (.js, .jsx)' }, { value: 'html', label: 'HTML (.html)' }, { value: 'css', label: 'CSS / SCSS (.css, .scss, .sass, .less)' } ] },
+  { group: 'Web (Frontend / Backend)', options: [ { value: 'typescript', label: 'TypeScript (.ts, .tsx)' }, { value: 'javascript', label: 'JavaScript (.js, .jsx)' } ] },
   { group: 'Java / Kotlin', options: [ { value: 'java', label: 'Java (.java)' }, { value: 'kotlin', label: 'Kotlin (.kt, .kts)' } ] },
   { group: 'Python', options: [ { value: 'python', label: 'Python (.py)' } ] },
   { group: 'C / C++', options: [ { value: 'c', label: 'C (.c, .h)' }, { value: 'cpp', label: 'C++ (.cpp, .hpp)' } ] },
@@ -40,7 +40,6 @@ const languageOptions = [
   { group: 'Go / Rust', options: [ { value: 'go', label: 'Go (.go)' }, { value: 'rust', label: 'Rust (.rs)' } ] },
   { group: 'Swift / Objective-C', options: [ { value: 'swift', label: 'Swift (.swift)' }, { value: 'objectivec', label: 'Objective-C (.m)' } ] },
   { group: 'Databases', options: [ { value: 'sql', label: 'SQL (.sql)' } ] },
-  { group: 'Configurations & Data', options: [ { value: 'json', label: 'JSON (.json)' }, { value: 'xml', label: 'XML (.xml)' }, { value: 'yaml', label: 'YAML (.yaml, .yml)' } ] },
   { group: 'Scripts', options: [ { value: 'shell', label: 'Shell (.sh, .bash)' }, { value: 'bat', label: 'Batch (.bat)' }, { value: 'powershell', label: 'PowerShell (.ps1)' } ] }
 ];
 

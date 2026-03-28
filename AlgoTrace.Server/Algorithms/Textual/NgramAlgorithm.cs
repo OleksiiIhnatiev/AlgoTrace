@@ -1,4 +1,4 @@
-﻿using AlgoTrace.Server.Interfaces;
+﻿﻿using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO.Analysis;
 using AlgoTrace.Server.Utils;
 
@@ -20,7 +20,7 @@ namespace AlgoTrace.Server.Algorithms.Textual
             {
                 var sBlock = string.Join(
                     "",
-                    sLines.Skip(i).Take(4).Select(SourceNormalizer.NormalizeLine)
+                    sLines.Skip(i).Take(4).Select(line => SourceNormalizer.NormalizeLine(line))
                 );
                 if (sBlock.Length < 20)
                     continue;
@@ -29,7 +29,7 @@ namespace AlgoTrace.Server.Algorithms.Textual
                 {
                     var tBlock = string.Join(
                         "",
-                        tLines.Skip(j).Take(4).Select(SourceNormalizer.NormalizeLine)
+                        tLines.Skip(j).Take(4).Select(line => SourceNormalizer.NormalizeLine(line))
                     );
                     double score = CalculateJaccard(sBlock, tBlock);
 

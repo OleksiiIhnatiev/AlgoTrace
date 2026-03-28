@@ -1,6 +1,7 @@
 using AlgoTrace.Server.Algorithms.Graph;
 using AlgoTrace.Server.Models.DTO.Analysis;
 using AlgoTrace.Server.Models.Tree;
+using static AlgoTrace.Server.Algorithms.Graph.GraphUtils;
 
 namespace AlgoTrace.Server.Interfaces
 {

@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+﻿﻿using System.Text.RegularExpressions;
 using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.Tree;
 
@@ -11,7 +11,8 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
         public UniversalNode Parse(string code)
         {
             var root = new UniversalNode { Type = UniversalNodeType.Program, Value = "RubyScript" };
-            var lines = code.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            var sanitizedCode = SanitizeRubyCode(code);
+            var lines = sanitizedCode.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
             var stack = new Stack<UniversalNode>();
             stack.Push(root);
@@ -41,6 +42,12 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
                 }
             }
             return root;
+        }
+
+        private string SanitizeRubyCode(string code)
+        {
+            var pattern = @"(""(?:\\.|[^\\""])*""|'(?:\\.|[^\\'])*'|#.*?$)";
+            return Regex.Replace(code, pattern, match => match.Value.StartsWith("#") ? "" : "\"STR\"", RegexOptions.Multiline);
         }
 
         private UniversalNode IdentifyNode(string line)

@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using AlgoTrace.Server.Algorithms.Graph;
@@ -6,6 +9,7 @@ using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO.Analysis;
 using AlgoTrace.Server.ParserFactory;
 using AlgoTrace.Server.Utils;
+using static AlgoTrace.Server.Algorithms.Graph.GraphUtils;
 
 namespace AlgoTrace.Server.Services
 {
@@ -77,7 +81,7 @@ namespace AlgoTrace.Server.Services
 
             if (categories.TreeBased != null && categories.TreeBased.Any())
             {
-                var result = ProcessTree(contentA, contentB, request.Language, categories.TreeBased);
+                var result = ProcessTree(contentA, contentB, request.Language, categories.TreeBased, parameters);
                 response.CategoriesResults.Add(result);
             }
 
@@ -196,7 +200,7 @@ namespace AlgoTrace.Server.Services
             return categoryResult;
         }
 
-        private CategoryResult ProcessTree(string a, string b, string lang, List<string> methods)
+        private CategoryResult ProcessTree(string a, string b, string lang, List<string> methods, Dictionary<string, object> parameters)
         {
             var categoryResult = new CategoryResult { CategoryName = "tree_based" };
 
@@ -212,7 +216,7 @@ namespace AlgoTrace.Server.Services
                 {
                     if (!methods.Contains(algo.Key)) continue;
 
-                    double score = algo.Calculate(treeA, treeB, out object evidence);
+                    double score = algo.Calculate(treeA, treeB, parameters, out object evidence);
                     totalScore += score / 100.0;
                     count++;
 
@@ -316,8 +320,15 @@ namespace AlgoTrace.Server.Services
         private List<TokenInfo> Tokenize(string code)
         {
             var tokens = new List<TokenInfo>();
-            var noComments = Regex.Replace(code, @"//.*|/\*[\s\S]*?\*/", " ");
-            string normalized = Regex.Replace(noComments, @"""[^""""]*""", " STR ");
+            
+            var pattern = @"(@""(?:[^""]|"""")*""|""(?:\\.|[^\\""])*""|'(?:\\.|[^\\'])*'|`(?:\\.|[^\\`])*`|//.*?$|/\*[\s\S]*?\*/|#.*?$)";
+            string normalized = Regex.Replace(code, pattern, match =>
+            {
+                if (match.Value.StartsWith("/") || match.Value.StartsWith("#"))
+                    return new string('\n', match.Value.Count(c => c == '\n'));
+                return " STR ";
+            }, RegexOptions.Multiline);
+
             normalized = Regex.Replace(normalized, @"\b\d+\b", " NUM ");
             normalized = Regex.Replace(normalized, @"\b(if|else|for|while|return|class|public|private|static|int|string|void|var)\b", " KEY ");
             normalized = Regex.Replace(normalized, @"[a-zA-Z_][a-zA-Z0-9_]*", " ID ");

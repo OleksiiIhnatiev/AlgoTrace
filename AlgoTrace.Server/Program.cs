@@ -57,14 +57,12 @@ builder.Services.AddScoped<ICodeParser, TypeScriptParser>();
 builder.Services.AddScoped<ICodeParser, PhpParser>();
 builder.Services.AddScoped<ICodeParser, GoParser>();
 builder.Services.AddScoped<ICodeParser, RubyParser>();
-builder.Services.AddScoped<ICodeParser, HtmlParser>();
 builder.Services.AddScoped<ICodeParser, CssParser>();
 builder.Services.AddScoped<ICodeParser, KotlinParser>();
 builder.Services.AddScoped<ICodeParser, RustParser>();
 builder.Services.AddScoped<ICodeParser, SwiftParser>();
 builder.Services.AddScoped<ICodeParser, BashParser>();
 builder.Services.AddScoped<ICodeParser, SqlParser>();
-builder.Services.AddScoped<ICodeParser, XmlParser>();
 builder.Services.AddScoped<ICodeParser, JsonParser>();
 builder.Services.AddScoped<ICodeParser, YamlParser>();
 
@@ -73,10 +71,32 @@ builder.Services.AddScoped<ParserFactory>();
 var app = builder.Build();
 
 // Автоматическое применение миграций базы данных при запуске приложения
+// Автоматическое применение миграций базы данных при запуске приложения
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    dbContext.Database.Migrate();
+    var maxRetries = 5;
+
+    for (int retry = 0; retry < maxRetries; retry++)
+    {
+        try
+        {
+            dbContext.Database.Migrate();
+            Console.WriteLine("Successfully connected to the database and applied migrations.");
+            break; 
+        }
+        catch (Microsoft.Data.SqlClient.SqlException ex)
+        {
+            if (retry == maxRetries - 1)
+            {
+                Console.WriteLine("Max retries reached. Could not connect to the database.");
+                throw;
+            }
+
+            Console.WriteLine($"Database not ready yet. Retrying in 5 seconds... (Attempt {retry + 1} of {maxRetries})");
+            Thread.Sleep(5000);
+        }
+    }
 }
 
 app.MapGroup("/auth").MapIdentityApi<User>();

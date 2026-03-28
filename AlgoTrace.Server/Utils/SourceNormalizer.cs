@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+﻿﻿using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -6,20 +6,27 @@ namespace AlgoTrace.Server.Utils
 {
     public static class SourceNormalizer
     {
-        public static string NormalizeLine(string line)
+        public static string NormalizeLine(string line, bool ignoreWhitespace = true)
         {
             if (string.IsNullOrWhiteSpace(line))
                 return string.Empty;
 
             try
             {
-                return Regex
-                    .Replace(line, @"\s+", "", RegexOptions.None, TimeSpan.FromSeconds(1))
-                    .ToLower();
+                var processed = line.ToLower();
+                if (ignoreWhitespace)
+                {
+                    processed = Regex.Replace(processed, @"\s+", "", RegexOptions.None, TimeSpan.FromSeconds(1));
+                }
+                return processed;
             }
             catch (RegexMatchTimeoutException)
             {
-                return line.Replace(" ", "").Replace("\t", "").ToLower();
+                if (ignoreWhitespace)
+                {
+                    return line.Replace(" ", "").Replace("\t", "").ToLower();
+                }
+                return line.ToLower();
             }
         }
 

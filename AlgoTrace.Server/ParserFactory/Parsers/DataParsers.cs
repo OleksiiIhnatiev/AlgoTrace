@@ -3,10 +3,6 @@ using AlgoTrace.Server.ParserFactory.Parsers.Base;
 
 namespace AlgoTrace.Server.ParserFactory.Parsers
 {
-    public class XmlParser : HtmlParser
-    {
-        public override string Language => "xml";
-    }
 
     public class JsonParser : BraceLanguageParser
     {

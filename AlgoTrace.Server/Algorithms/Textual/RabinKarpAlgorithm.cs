@@ -1,4 +1,4 @@
-﻿using AlgoTrace.Server.Interfaces;
+﻿﻿using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO.Analysis;
 using AlgoTrace.Server.Utils;
 
@@ -22,7 +22,7 @@ namespace AlgoTrace.Server.Algorithms.Textual
             {
                 var block = string.Join(
                     "\n",
-                    sLines.Skip(i).Take(blockSize).Select(SourceNormalizer.NormalizeLine)
+                    sLines.Skip(i).Take(blockSize).Select(line => SourceNormalizer.NormalizeLine(line))
                 );
 
                 if (block.Length < 50)
@@ -32,7 +32,7 @@ namespace AlgoTrace.Server.Algorithms.Textual
                 {
                     var targetBlock = string.Join(
                         "\n",
-                        tLines.Skip(j).Take(blockSize).Select(SourceNormalizer.NormalizeLine)
+                        tLines.Skip(j).Take(blockSize).Select(line => SourceNormalizer.NormalizeLine(line))
                     );
 
                     if (block == targetBlock)

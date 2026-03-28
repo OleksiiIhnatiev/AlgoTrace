@@ -67,17 +67,12 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
 
         private string GetNodeValue(SyntaxNode node)
         {
-            if (node is MethodDeclarationSyntax method)
-                return method.Identifier.Text;
-            if (node is VariableDeclaratorSyntax variable)
-                return variable.Identifier.Text;
-            if (node is ClassDeclarationSyntax classDecl)
-                return classDecl.Identifier.Text;
-            if (node is IdentifierNameSyntax id)
-                return id.Identifier.Text;
-            if (node is LiteralExpressionSyntax literal)
-                return literal.Token.ValueText;
-
+            if (node is MethodDeclarationSyntax method) return method.Identifier.Text;
+            if (node is VariableDeclaratorSyntax variable) return variable.Identifier.Text;
+            if (node is ClassDeclarationSyntax classDecl) return classDecl.Identifier.Text;
+            if (node is IdentifierNameSyntax id) return id.Identifier.Text;
+            if (node is LiteralExpressionSyntax literal) return literal.Token.ValueText;
+            if (node is BinaryExpressionSyntax binary) return binary.OperatorToken.Text;
             return string.Empty;
         }
     }

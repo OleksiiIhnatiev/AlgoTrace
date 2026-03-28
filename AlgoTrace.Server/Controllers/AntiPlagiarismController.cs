@@ -7,6 +7,8 @@ using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO.Analysis;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using System;
 
 namespace AlgoTrace.Server.Controllers
 {
@@ -16,14 +18,17 @@ namespace AlgoTrace.Server.Controllers
     {
         private readonly IUnifiedAnalysisService _unifiedService;
         private readonly ApplicationDbContext _context;
+        private readonly ILogger<AnalysisController> _logger;
 
         public AnalysisController(
             IUnifiedAnalysisService unifiedService,
-            ApplicationDbContext context
+            ApplicationDbContext context,
+            ILogger<AnalysisController> logger
         )
         {
             _unifiedService = unifiedService;
             _context = context;
+            _logger = logger;
         }
 
         [HttpPost("unified")]
@@ -94,87 +99,99 @@ namespace AlgoTrace.Server.Controllers
 
             foreach (var docId in request.CompareWithDocumentIds)
             {
-                if (!System.Guid.TryParse(docId, out var fileId))
+                try
                 {
-                    multiResponse.Results.Add(
-                        new DocumentComparisonResult
-                        {
-                            DocumentId = docId,
-                            Error = "invalid_document_id",
-                        }
-                    );
-                    continue;
-                }
-
-                var targetFile = await _context
-                    .SourceFiles.AsNoTracking()
-                    .FirstOrDefaultAsync(f => f.FileId == fileId);
-
-                if (targetFile == null)
-                {
-                    multiResponse.Results.Add(
-                        new DocumentComparisonResult
-                        {
-                            DocumentId = docId,
-                            Error = "document_not_found_in_db",
-                        }
-                    );
-                    continue;
-                }
-
-                var storageFolder = Path.Combine(Directory.GetCurrentDirectory(), "Storage");
-                var fullFilePath = Path.Combine(storageFolder, targetFile.Path);
-
-                if (!System.IO.File.Exists(fullFilePath))
-                {
-                    multiResponse.Results.Add(
-                        new DocumentComparisonResult
-                        {
-                            DocumentId = docId,
-                            Error = "document_file_missing_on_disk",
-                        }
-                    );
-                    continue;
-                }
-
-                var targetContent = await System.IO.File.ReadAllTextAsync(fullFilePath);
-
-                var unifiedRequest = new UnifiedAnalysisRequest
-                {
-                    Language = request.Language,
-                    SubmissionA = request.Submission,
-                    SubmissionB = new SubmissionData
+                    if (!Guid.TryParse(docId, out var fileId))
                     {
-                        Files = new List<CodeFile>
-                        {
-                            new CodeFile { Filename = targetFile.Name, Content = targetContent },
-                        },
-                    },
-                    AnalysisConfig = new UnifiedConfig
-                    {
-                        Parameters = request.AnalysisConfig.Parameters,
-                        ExecuteCategories = executeCategories,
-                    },
-                };
-
-                var unifiedResult = _unifiedService.Analyze(unifiedRequest);
-
-                multiResponse.Results.Add(
-                    new DocumentComparisonResult
-                    {
-                        DocumentId = docId,
-                        TargetFile = new CodeFile
-                        {
-                            Filename = targetFile.Name,
-                            Content = targetContent,
-                        },
-                        GlobalSimilarityScore = unifiedResult.GlobalSimilarityScore,
-                        CategoriesResults = unifiedResult.CategoriesResults,
+                        var errorMessage = $"Неверный формат идентификатора документа: {docId}";
+                        _logger.LogWarning(errorMessage);
+                        multiResponse.Results.Add(
+                            new DocumentComparisonResult { DocumentId = docId, Error = errorMessage, }
+                        );
+                        continue;
                     }
-                );
+
+                    var targetFile = await _context
+                        .SourceFiles.AsNoTracking()
+                        .FirstOrDefaultAsync(f => f.FileId == fileId);
+
+                    if (targetFile == null)
+                    {
+                        var errorMessage = $"Документ с ID {docId} не найден в базе данных.";
+                        _logger.LogWarning(errorMessage);
+                        multiResponse.Results.Add(
+                            new DocumentComparisonResult { DocumentId = docId, Error = errorMessage, }
+                        );
+                        continue;
+                    }
+
+                    var storageFolder = Path.Combine(Directory.GetCurrentDirectory(), "Storage");
+                    var fullFilePath = Path.Combine(storageFolder, targetFile.Path);
+
+                    if (!System.IO.File.Exists(fullFilePath))
+                    {
+                        var errorMessage =
+                            $"Файл документа отсутствует на диске. Путь: {fullFilePath}";
+                        _logger.LogError(errorMessage);
+                        multiResponse.Results.Add(
+                            new DocumentComparisonResult { DocumentId = docId, Error = errorMessage, }
+                        );
+                        continue;
+                    }
+
+                    var targetContent = await System.IO.File.ReadAllTextAsync(fullFilePath);
+
+                    var unifiedRequest = new UnifiedAnalysisRequest
+                    {
+                        Language = request.Language,
+                        SubmissionA = request.Submission,
+                        SubmissionB = new SubmissionData
+                        {
+                            Files = new List<CodeFile>
+                            {
+                                new CodeFile { Filename = targetFile.Name, Content = targetContent },
+                            },
+                        },
+                        AnalysisConfig = new UnifiedConfig
+                        {
+                            Parameters = request.AnalysisConfig.Parameters,
+                            ExecuteCategories = executeCategories,
+                        },
+                    };
+
+                    var unifiedResult = _unifiedService.Analyze(unifiedRequest);
+
+                    multiResponse.Results.Add(
+                        new DocumentComparisonResult
+                        {
+                            DocumentId = docId,
+                            TargetFile = new CodeFile
+                            {
+                                Filename = targetFile.Name,
+                                Content = targetContent,
+                            },
+                            GlobalSimilarityScore = unifiedResult.GlobalSimilarityScore,
+                            CategoriesResults = unifiedResult.CategoriesResults,
+                        }
+                    );
+                }
+                catch (Exception ex)
+                {
+                    var errorMessage =
+                        $"Произошла непредвиденная ошибка при обработке документа {docId}.";
+                    _logger.LogError(ex, errorMessage);
+                    multiResponse.Results.Add(
+                        new DocumentComparisonResult
+                        {
+                            DocumentId = docId,
+                            Error = $"{errorMessage} Детали: {ex.Message}"
+                        }
+                    );
+                }
             }
 
             return Ok(multiResponse);
         }
     }
 }
+                

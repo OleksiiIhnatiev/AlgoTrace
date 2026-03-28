@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+﻿﻿using System.Text.RegularExpressions;
 using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.Tree;
 
@@ -11,7 +11,8 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
         public UniversalNode Parse(string code)
         {
             var root = new UniversalNode { Type = UniversalNodeType.Program, Value = "BashScript" };
-            var lines = code.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            var sanitizedCode = SanitizeBashCode(code);
+            var lines = sanitizedCode.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             var stack = new Stack<UniversalNode>();
             stack.Push(root);
 
@@ -49,6 +50,16 @@ namespace AlgoTrace.Server.ParserFactory.Parsers
                 }
             }
             return root;
+        }
+
+        private string SanitizeBashCode(string code)
+        {
+            var pattern = @"(""(?:\\.|[^\\""])*""|'(?:\\.|[^\\'])*'|#.*?$)";
+            return Regex.Replace(code, pattern, match =>
+            {
+                if (match.Value.StartsWith("#")) return "";
+                return "\"STR\"";
+            }, RegexOptions.Multiline);
         }
     }
 }
