@@ -26,10 +26,22 @@ interface MatchedBlock {
   file_b?: string;
 }
 
-interface MatchedHash {
-  hash_value: string;
-  token_sequence: string;
-  occurrences: { submission: 'a' | 'b' }[];
+interface EvidenceToken {
+  value: string;
+  line: number;
+  start_index: number;
+  end_index: number;
+}
+
+interface SequenceOccurrence {
+  submission: string;
+  tokens: EvidenceToken[];
+}
+
+interface MatchedSequence {
+  sequence_id: string;
+  type: string;
+  occurrences: SequenceOccurrence[];
 }
 
 interface ASTMatch {
@@ -78,7 +90,7 @@ interface CFGGraph {
 
 interface Evidence {
   matched_blocks?: MatchedBlock[];
-  matched_hashes?: MatchedHash[];
+  matched_sequences?: MatchedSequence[];
   matched_subtrees?: SubtreeMatch[];
   matches?: GraphMatch[];
   graph_a?: CFGGraph;
@@ -236,8 +248,67 @@ const onPdfGenerated = () => {
   showExportModal.value = false;
 };
 
-const globalScore = computed(() => {
-  return report.value?.global_similarity_score ? Math.round(report.value.global_similarity_score * 100) : 0;
+const similarityStats = computed(() => {
+  const results = report.value?.categories_results;
+  if (!results) return null;
+
+  const allAlgos: { name: string, score: number }[] = [];
+
+  results.forEach(cat => {
+    if (cat.algorithms) {
+      cat.algorithms.forEach(algo => {
+        allAlgos.push({
+          name: formatMethodName(algo.method),
+          score: (algo.similarity_score ?? 0) * 100
+        });
+      });
+    }
+  });
+
+  const count = allAlgos.length;
+  if (count === 0) return null;
+
+  allAlgos.sort((a, b) => a.score - b.score);
+
+  const firstMatch = allAlgos[0];
+  const lastMatch = allAlgos[count - 1];
+
+  if (!firstMatch || !lastMatch) return null;
+
+  const minScore = firstMatch.score;
+  const maxScore = lastMatch.score;
+
+  const minAlgos = allAlgos
+    .filter(a => Math.abs(a.score - minScore) < 0.01)
+    .map(a => a.name);
+    
+  const maxAlgos = allAlgos
+    .filter(a => Math.abs(a.score - maxScore) < 0.01)
+    .map(a => a.name);
+
+  const sum = allAlgos.reduce((acc, curr) => acc + curr.score, 0);
+  const avgScore = sum / count;
+
+  let medianScore = 0;
+  const mid = Math.floor(count / 2);
+  
+  const midAlgo = allAlgos[mid];
+  const prevMidAlgo = allAlgos[mid - 1];
+
+  if (count % 2 === 0 && midAlgo && prevMidAlgo) {
+    medianScore = (prevMidAlgo.score + midAlgo.score) / 2;
+  } else if (midAlgo) {
+    medianScore = midAlgo.score;
+  }
+
+  return {
+    min: Math.round(minScore),
+    minAlgos,
+    max: Math.round(maxScore),
+    maxAlgos,
+    avg: Math.round(avgScore),
+    median: Math.round(medianScore)
+  };
 });
 
 const getScoreColorHex = (score: number) => {
@@ -395,6 +466,17 @@ const getLinesContent = (code: string | undefined, lines: number[] | undefined, 
   return result.join('\n');
 };
 
+const getLineAndColumn = (code: string, index: number) => {
+  if (!code) return { line: 1, column: 1 };
+  if (index < 0) index = 0;
+  if (index > code.length) index = code.length;
+  const textBefore = code.substring(0, index);
+  const line = (textBefore.match(/\n/g) || []).length + 1;
+  const lastNewline = textBefore.lastIndexOf('\n');
+  const column = index - lastNewline;
+  return { line, column };
+};
+
 const editorRefA = shallowRef();
 const editorRefB = shallowRef();
 let monacoInstance: typeof monaco | null = null;
@@ -442,19 +524,62 @@ const updateMonacoDecorations = () => {
   const algo = activeAlgorithm.value;
   const m = monacoInstance;
 
-  const linesA = getHighlightedLines('a', algo.evidence_type, algo.evidence);
-  const linesB = getHighlightedLines('b', algo.evidence_type, algo.evidence);
-
-  const createRanges = (lines: number[]) => lines.map(l => ({
-    range: new m.Range(l, 1, l, 1),
-    options: { isWholeLine: true, className: 'plagiarism-highlight', marginClassName: 'plagiarism-margin' }
-  }));
-
   if (decorationsCollectionA) decorationsCollectionA.clear();
   if (decorationsCollectionB) decorationsCollectionB.clear();
 
-  decorationsCollectionA = editorRefA.value.createDecorationsCollection(createRanges(linesA));
-  decorationsCollectionB = editorRefB.value.createDecorationsCollection(createRanges(linesB));
+  const rangesA: monaco.editor.IModelDeltaDecoration[] = [];
+  const rangesB: monaco.editor.IModelDeltaDecoration[] = [];
+
+  if (algo.evidence_type === 'token_sequence' && algo.evidence.matched_sequences) {
+    const codeA = report.value?.source_files.file_a || '';
+    const codeB = report.value?.source_files.file_b || '';
+
+    algo.evidence.matched_sequences.forEach((seq, sIdx) => {
+      const occA = seq.occurrences.find(o => o.submission === 'a');
+      const occB = seq.occurrences.find(o => o.submission === 'b');
+      const colorClass = `token-color-${sIdx % 10}`;
+
+      const isJaccard = algo.method === 'jaccard_token';
+      const tokenVal = occA?.tokens[0]?.value || occB?.tokens[0]?.value || '';
+      const hoverMessage = { value: isJaccard ? `**Спільний токен: ${tokenVal}**\nТип: ${formatTokenSequence(seq.type)}` : `**Послідовність #${sIdx + 1}**\nТип: ${formatTokenSequence(seq.type)}` };
+
+      if (occA) {
+        occA.tokens.forEach(t => {
+          const startPos = getLineAndColumn(codeA, t.start_index);
+          const endPos = getLineAndColumn(codeA, t.end_index);
+          rangesA.push({
+            range: new m.Range(startPos.line, startPos.column, endPos.line, endPos.column),
+            options: { className: colorClass, hoverMessage }
+          });
+        });
+      }
+      if (occB) {
+        occB.tokens.forEach(t => {
+          const startPos = getLineAndColumn(codeB, t.start_index);
+          const endPos = getLineAndColumn(codeB, t.end_index);
+          rangesB.push({
+            range: new m.Range(startPos.line, startPos.column, endPos.line, endPos.column),
+            options: { className: colorClass, hoverMessage }
+          });
+        });
+      }
+    });
+  } else {
+    const linesA = getHighlightedLines('a', algo.evidence_type, algo.evidence);
+    const linesB = getHighlightedLines('b', algo.evidence_type, algo.evidence);
+
+    linesA.forEach(l => rangesA.push({
+      range: new m.Range(l, 1, l, 1),
+      options: { isWholeLine: true, className: 'plagiarism-highlight', marginClassName: 'plagiarism-margin' }
+    }));
+    linesB.forEach(l => rangesB.push({
+      range: new m.Range(l, 1, l, 1),
+      options: { isWholeLine: true, className: 'plagiarism-highlight', marginClassName: 'plagiarism-margin' }
+    }));
+  }
+
+  decorationsCollectionA = editorRefA.value.createDecorationsCollection(rangesA);
+  decorationsCollectionB = editorRefB.value.createDecorationsCollection(rangesB);
 };
 
 watch(activeAlgorithm, () => nextTick(updateMonacoDecorations));
@@ -519,8 +644,16 @@ const metricsChartOption = computed(() => {
   };
 });
 
-const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
-  return hash.occurrences?.some(o => o.submission === sub);
+const getOcc = (seq: MatchedSequence, sub: 'a' | 'b') => {
+  return seq.occurrences.find(o => o.submission === sub);
+};
+
+const getTokensLines = (occ: SequenceOccurrence | undefined) => {
+  if (!occ || !occ.tokens || occ.tokens.length === 0) return '';
+  const lines = occ.tokens.map(t => t.line);
+  const min = Math.min(...lines);
+  const max = Math.max(...lines);
+  return min === max ? `${min}` : `${min}-${max}`;
 };
 </script>
 
@@ -566,34 +699,69 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
               </select>
            </div>
 
-           <div class="glass-card p-5 text-center position-relative overflow-hidden">
-             <div class="position-absolute top-0 start-0 w-100 h-100 opacity-25" :style="`background: radial-gradient(circle at center, ${getScoreColorHex(globalScore)} 0%, transparent 70%);`"></div>
-             <h5 class="fw-bold text-dark mb-4 position-relative z-1 text-uppercase tracking-wider fs-6">Глобальна схожість</h5>
+           <div class="glass-card p-4 position-relative overflow-hidden shadow-sm d-flex flex-column" v-if="similarityStats">
+              <h6 class="text-muted text-uppercase fw-bold mb-4 px-1" style="letter-spacing: 1px; font-size: 0.75rem;">
+                <i class="bi bi-speedometer2 me-2"></i>Глобальна статистика
+              </h6>
 
-             <div class="position-relative d-inline-flex align-items-center justify-content-center mb-4" style="width: 200px; height: 200px;">
-               <div class="position-absolute w-100 h-100 rounded-circle" :style="`background: ${getScoreColorHex(globalScore)}; filter: blur(40px); opacity: 0.15;`"></div>
-               <svg class="w-100 h-100 position-relative z-1" viewBox="0 0 100 100">
-                 <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(0,0,0,0.05)" stroke-width="8" />
-                 <circle cx="50" cy="50" r="42" fill="none"
-                         :stroke="getScoreColorHex(globalScore)"
-                         stroke-width="8"
-                         stroke-dasharray="264"
-                         :stroke-dashoffset="264 - (264 * globalScore) / 100"
-                         stroke-linecap="round"
-                         transform="rotate(-90 50 50)"
-                         style="transition: stroke-dashoffset 2s cubic-bezier(0.4, 0, 0.2, 1);" />
-               </svg>
-               <div class="position-absolute text-dark z-2 d-flex flex-column align-items-center justify-content-center w-100">
-                 <span class="fw-black glow-text" style="font-size: 3.5rem; line-height: 1; letter-spacing: -2px;" :style="`color: ${getScoreColorHex(globalScore)}`">{{ globalScore }}%</span>
-               </div>
-             </div>
+              <div class="d-flex flex-column gap-3">
+                <div class="p-3 rounded-4 border bg-light d-flex align-items-center justify-content-between">
+                  <div class="d-flex flex-column">
+                    <div class="text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.65rem;">Максимальна схожість</div>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                      <span class="fs-3 fw-bold text-dark lh-1">{{ similarityStats.max }}%</span>
+                      <span class="badge bg-white text-secondary border shadow-sm text-truncate" style="max-width: 140px; font-size: 0.7rem;" v-if="similarityStats.maxAlgos.length === 1" :title="similarityStats.maxAlgos[0]">
+                        {{ similarityStats.maxAlgos[0] }}
+                      </span>
+                      <span class="badge bg-white text-secondary border shadow-sm cursor-pointer" style="cursor: help; font-size: 0.7rem;" v-else :title="similarityStats.maxAlgos.join('\n')">
+                        {{ similarityStats.maxAlgos.length }} алг. <i class="bi bi-info-circle ms-1"></i>
+                      </span>
+                    </div>
+                  </div>
+                  <div class="position-relative d-flex align-items-center justify-content-center flex-shrink-0">
+                    <svg viewBox="0 0 36 36" style="width: 46px; height: 46px; transform: rotate(-90deg);">
+                      <circle cx="18" cy="18" r="15.9155" fill="none" stroke="rgba(0,0,0,0.05)" stroke-width="4" />
+                      <circle cx="18" cy="18" r="15.9155" fill="none" :stroke="getScoreColorHex(similarityStats.max)" stroke-width="4" :stroke-dasharray="`${similarityStats.max}, 100`" stroke-linecap="round" style="transition: stroke-dasharray 1s ease-out;" />
+                    </svg>
+                  </div>
+                </div>
 
-             <div class="position-relative z-1">
-                <span class="badge border bg-white px-4 py-2 rounded-pill fs-6 fw-bold shadow-sm" :style="`color: ${getScoreColorHex(globalScore)}; border-color: ${getScoreColorHex(globalScore)} !important;`">
-                  <i class="bi me-2" :class="globalScore < 30 ? 'bi-shield-check' : globalScore < 70 ? 'bi-exclamation-triangle' : 'bi-x-octagon'"></i>
-                  {{ globalScore < 30 ? 'Низька схожість' : globalScore < 70 ? 'Середня схожість' : 'Високий ризик' }}
-                </span>
-             </div>
+                <div class="row g-2">
+                  <div class="col-6">
+                    <div class="p-3 rounded-4 border bg-light h-100 d-flex flex-column justify-content-center text-center">
+                      <div class="text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.65rem;">Середнє</div>
+                      <span class="fs-4 fw-bold text-dark lh-1">{{ similarityStats.avg }}%</span>
+                    </div>
+                  </div>
+                  <div class="col-6">
+                    <div class="p-3 rounded-4 border bg-light h-100 d-flex flex-column justify-content-center text-center cursor-pointer" style="cursor: help;" title="Медіана стійкіша до екстремальних значень (викидів), ніж середнє арифметичне. Це 'золота середина' всіх результатів.">
+                      <div class="text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.65rem;">Медіана <i class="bi bi-question-circle"></i></div>
+                      <span class="fs-4 fw-bold text-dark lh-1">{{ similarityStats.median }}%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="p-3 rounded-4 border bg-light d-flex align-items-center justify-content-between">
+                  <div class="d-flex flex-column">
+                    <div class="text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.65rem;">Мінімальна схожість</div>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                      <span class="fs-3 fw-bold text-dark lh-1">{{ similarityStats.min }}%</span>
+                      <span class="badge bg-white text-secondary border shadow-sm text-truncate" style="max-width: 140px; font-size: 0.7rem;" v-if="similarityStats.minAlgos.length === 1" :title="similarityStats.minAlgos[0]">
+                        {{ similarityStats.minAlgos[0] }}
+                      </span>
+                      <span class="badge bg-white text-secondary border shadow-sm cursor-pointer" style="cursor: help; font-size: 0.7rem;" v-else :title="similarityStats.minAlgos.join('\n')">
+                        {{ similarityStats.minAlgos.length }} алг. <i class="bi bi-info-circle ms-1"></i>
+                      </span>
+                    </div>
+                  </div>
+                  <div class="position-relative d-flex align-items-center justify-content-center flex-shrink-0">
+                    <svg viewBox="0 0 36 36" style="width: 46px; height: 46px; transform: rotate(-90deg);">
+                      <circle cx="18" cy="18" r="15.9155" fill="none" stroke="rgba(0,0,0,0.05)" stroke-width="4" />
+                      <circle cx="18" cy="18" r="15.9155" fill="none" :stroke="getScoreColorHex(similarityStats.min)" stroke-width="4" :stroke-dasharray="`${similarityStats.min}, 100`" stroke-linecap="round" style="transition: stroke-dasharray 1s ease-out;" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
            </div>
 
            <div class="glass-card p-3 flex-grow-1 custom-scrollbar overflow-auto" style="min-height: 400px; height: 0;">
@@ -663,11 +831,9 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                    </div>
                 </div>
 
-                <!-- Body -->
                 <div class="p-4 flex-grow-1 overflow-auto custom-scrollbar bg-white">
 
-                   <!-- MAC OS DUAL CODE VIEWER (Для структурних збігів) -->
-                   <div v-if="['text_highlight', 'ast_tree_mapping', 'graph_mapping'].includes(activeAlgorithm.evidence_type) && report.source_files" class="row g-4 mb-5">
+                   <div v-if="['text_highlight', 'ast_tree_mapping', 'graph_mapping', 'token_sequence'].includes(activeAlgorithm.evidence_type) && report.source_files" class="row g-4 mb-5">
                      <div class="col-xl-6">
                        <div class="mac-window rounded-4 overflow-hidden border shadow-sm d-flex flex-column h-100">
                           <div class="mac-header bg-light d-flex align-items-center px-3 py-2 border-bottom">
@@ -743,40 +909,96 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                    </div>
 
                    <div v-else-if="activeAlgorithm.evidence_type === 'token_sequence'">
-                      <div v-if="!activeAlgorithm.evidence?.matched_hashes || activeAlgorithm.evidence.matched_hashes.length === 0" class="text-center py-5">
+                      <div v-if="!activeAlgorithm.evidence?.matched_sequences || activeAlgorithm.evidence.matched_sequences.length === 0" class="text-center py-5">
                         <i class="bi bi-shield-check text-success display-1 d-block mb-3 opacity-50 glow-text"></i>
                         <h5 class="text-muted">Збігів токенів не знайдено</h5>
                       </div>
-                      <div v-else class="table-responsive bg-white rounded-4 border shadow-sm">
-                        <table class="table light-table align-middle mb-0">
-                          <thead class="bg-light text-uppercase tracking-wider" style="font-size: 0.75rem;">
-                            <tr>
-                              <th class="py-4 px-4">Опис збігу (Хеш послідовності)</th>
-                              <th class="py-4 px-4 text-center">Наявність (Файл 1)</th>
-                              <th class="py-4 px-4 text-center">Наявність (Файл 2)</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr v-for="(hash, hIdx) in activeAlgorithm.evidence.matched_hashes" :key="hIdx">
-                              <td class="py-3 px-4">
-                                <span class="badge bg-light text-secondary border me-3 font-monospace px-2 py-1">{{ hash.hash_value }}</span>
-                                <span class="fw-medium text-dark font-monospace small">{{ formatTokenSequence(hash.token_sequence) }}</span>
-                              </td>
-                              <td class="py-3 px-4 text-center">
-                                 <span v-if="hasOccurrence(hash, 'a')" class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-50 px-3 py-2 rounded-pill">
-                                    Знайдено
-                                 </span>
-                                 <span v-else class="text-muted">-</span>
-                              </td>
-                              <td class="py-3 px-4 text-center">
-                                 <span v-if="hasOccurrence(hash, 'b')" class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-50 px-3 py-2 rounded-pill">
-                                    Знайдено
-                                 </span>
-                                 <span v-else class="text-muted">-</span>
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
+                      <div v-else-if="activeAlgorithm.method === 'jaccard_token'">
+                         <h6 class="text-muted text-uppercase fw-bold mb-3 tracking-wider"><i class="bi bi-fonts me-2"></i> Спільний словник токенів</h6>
+                         <div class="table-responsive bg-white rounded-4 border shadow-sm custom-scrollbar" style="max-height: 500px; overflow-y: auto;">
+                            <table class="table light-table mb-0 align-middle">
+                               <thead class="bg-light text-uppercase tracking-wider" style="position: sticky; top: 0; z-index: 1; font-size: 0.75rem;">
+                                  <tr>
+                                     <th class="py-3 px-4 border-0">Токен</th>
+                                     <th class="py-3 px-4 text-center border-0">Файл 1 (зустрічань)</th>
+                                     <th class="py-3 px-4 text-center border-0">Файл 2 (зустрічань)</th>
+                                  </tr>
+                               </thead>
+                               <tbody>
+                                  <tr v-for="(seq, sIdx) in activeAlgorithm.evidence.matched_sequences" :key="sIdx">
+                                     <td class="py-3 px-4">
+                                        <div class="d-flex align-items-center">
+                                           <div class="rounded-circle me-3 shadow-sm" :class="'bg-token-' + (sIdx % 10)" style="width: 12px; height: 12px; flex-shrink: 0;"></div>
+                                           <span class="badge border shadow-sm py-2 px-3 fw-bold text-dark font-monospace bg-white" style="font-size: 0.85rem;">
+                                              {{ getOcc(seq, 'a')?.tokens[0]?.value || getOcc(seq, 'b')?.tokens[0]?.value }}
+                                           </span>
+                                        </div>
+                                     </td>
+                                     <td class="py-3 px-4 text-center">
+                                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-3 py-2 rounded-pill font-monospace" style="font-size: 0.8rem;">
+                                           {{ getOcc(seq, 'a')?.tokens.length || 0 }}
+                                        </span>
+                                     </td>
+                                     <td class="py-3 px-4 text-center">
+                                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-3 py-2 rounded-pill font-monospace" style="font-size: 0.8rem;">
+                                           {{ getOcc(seq, 'b')?.tokens.length || 0 }}
+                                        </span>
+                                     </td>
+                                  </tr>
+                               </tbody>
+                            </table>
+                         </div>
+                      </div>
+                      <div v-else>
+                        <h6 class="text-muted text-uppercase fw-bold mb-3 tracking-wider"><i class="bi bi-braces me-2"></i> Деталі збігів токенів</h6>
+                        <div class="accordion light-accordion shadow-sm" :id="'acc-tok-' + activeAlgorithm.method">
+                           <div class="accordion-item" v-for="(seq, sIdx) in activeAlgorithm.evidence.matched_sequences" :key="sIdx">
+                              <h2 class="accordion-header">
+                                 <button class="accordion-button fw-bold" :class="{'collapsed': sIdx !== 0}" type="button" data-bs-toggle="collapse" :data-bs-target="'#col-tok-' + activeAlgorithm.method + '-' + sIdx">
+                                    <div class="rounded-circle me-3 shadow-sm" :class="'bg-token-' + (sIdx % 10)" style="width: 14px; height: 14px; flex-shrink: 0;"></div>
+                                    Послідовність #{{ sIdx + 1 }}
+                                    <span class="badge bg-light text-secondary border ms-3 fw-normal">{{ formatTokenSequence(seq.type) }}</span>
+                                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 ms-2 fw-normal" v-if="seq.occurrences[0]?.tokens.length">{{ seq.occurrences[0].tokens.length }} токенів</span>
+                                 </button>
+                              </h2>
+                              <div :id="'col-tok-' + activeAlgorithm.method + '-' + sIdx" class="accordion-collapse collapse" :class="{'show': sIdx === 0}" :data-bs-parent="'#acc-tok-' + activeAlgorithm.method">
+                                 <div class="accordion-body p-4 bg-white d-flex flex-column gap-4">
+                                    <div v-if="getOcc(seq, 'a')" class="border rounded-3 p-3 bg-light bg-opacity-50">
+                                       <div class="small fw-bold text-muted mb-3 d-flex justify-content-between">
+                                          <span><i class="bi bi-file-earmark-code me-2"></i> Файл 1</span>
+                                          <span class="badge bg-secondary bg-opacity-10 text-secondary border">
+                                             Рядки: {{ getTokensLines(getOcc(seq, 'a')) }}
+                                          </span>
+                                       </div>
+                                       <div class="d-flex flex-wrap gap-2 align-items-center font-monospace small">
+                                          <template v-for="(tok, tIdx) in getOcc(seq, 'a')?.tokens" :key="tIdx">
+                                             <span class="badge border shadow-sm py-2 px-3 fw-medium" :class="'bg-token-' + (sIdx % 10)" style="opacity: 0.9;">
+                                               <span>{{ tok.value }}</span>
+                                             </span>
+                                             <i class="bi bi-arrow-right text-muted opacity-50" v-if="tIdx < (getOcc(seq, 'a')?.tokens.length || 0) - 1"></i>
+                                          </template>
+                                       </div>
+                                    </div>
+                                    <div v-if="getOcc(seq, 'b')" class="border rounded-3 p-3 bg-light bg-opacity-50">
+                                       <div class="small fw-bold text-muted mb-3 d-flex justify-content-between">
+                                          <span><i class="bi bi-file-earmark-code text-danger me-2"></i> Файл 2</span>
+                                          <span class="badge bg-secondary bg-opacity-10 text-secondary border">
+                                             Рядки: {{ getTokensLines(getOcc(seq, 'b')) }}
+                                          </span>
+                                       </div>
+                                       <div class="d-flex flex-wrap gap-2 align-items-center font-monospace small">
+                                          <template v-for="(tok, tIdx) in getOcc(seq, 'b')?.tokens" :key="tIdx">
+                                             <span class="badge border shadow-sm py-2 px-3 fw-medium" :class="'bg-token-' + (sIdx % 10)" style="opacity: 0.9;">
+                                               <span>{{ tok.value }}</span>
+                                             </span>
+                                             <i class="bi bi-arrow-right text-muted opacity-50" v-if="tIdx < (getOcc(seq, 'b')?.tokens.length || 0) - 1"></i>
+                                          </template>
+                                       </div>
+                                    </div>
+                                 </div>
+                              </div>
+                           </div>
+                        </div>
                       </div>
                    </div>
 
@@ -806,7 +1028,7 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                                 </tr>
                               </tbody>
                             </table>
-                         </div>
+                          </div>
 
                           <div class="accordion light-accordion mt-4 shadow-sm" :id="'acc-ast-' + activeAlgorithm.method">
                             <div class="accordion-item border-0">
@@ -1010,7 +1232,7 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                    </div>
 
                 </div>
-             </div>
+              </div>
            </div>
         </div>
 
@@ -1132,6 +1354,30 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
 :deep(.plagiarism-highlight) {
   background-color: rgba(220, 53, 69, 0.15) !important;
 }
+
+/* TOKEN COLORS PALETTE */
+:deep(.token-color-0) { background-color: rgba(220, 53, 69, 0.3) !important; border-bottom: 2px solid #dc3545; }
+:deep(.token-color-1) { background-color: rgba(13, 110, 253, 0.3) !important; border-bottom: 2px solid #0d6efd; }
+:deep(.token-color-2) { background-color: rgba(25, 135, 84, 0.3) !important; border-bottom: 2px solid #198754; }
+:deep(.token-color-3) { background-color: rgba(111, 66, 193, 0.3) !important; border-bottom: 2px solid #6f42c1; }
+:deep(.token-color-4) { background-color: rgba(253, 126, 20, 0.3) !important; border-bottom: 2px solid #fd7e14; }
+:deep(.token-color-5) { background-color: rgba(32, 201, 151, 0.3) !important; border-bottom: 2px solid #20c997; }
+:deep(.token-color-6) { background-color: rgba(214, 51, 132, 0.3) !important; border-bottom: 2px solid #d63384; }
+:deep(.token-color-7) { background-color: rgba(255, 193, 7, 0.3) !important; border-bottom: 2px solid #ffc107; }
+:deep(.token-color-8) { background-color: rgba(13, 202, 240, 0.3) !important; border-bottom: 2px solid #0dcaf0; }
+:deep(.token-color-9) { background-color: rgba(102, 16, 242, 0.3) !important; border-bottom: 2px solid #6610f2; }
+
+.bg-token-0 { background-color: #dc3545 !important; color: white; }
+.bg-token-1 { background-color: #0d6efd !important; color: white; }
+.bg-token-2 { background-color: #198754 !important; color: white; }
+.bg-token-3 { background-color: #6f42c1 !important; color: white; }
+.bg-token-4 { background-color: #fd7e14 !important; color: white; }
+.bg-token-5 { background-color: #20c997 !important; color: white; }
+.bg-token-6 { background-color: #d63384 !important; color: white; }
+.bg-token-7 { background-color: #ffc107 !important; color: black; }
+.bg-token-8 { background-color: #0dcaf0 !important; color: black; }
+.bg-token-9 { background-color: #6610f2 !important; color: white; }
+
 :deep(.plagiarism-margin) {
   background-color: rgba(220, 53, 69, 0.5) !important;
   width: 4px !important;

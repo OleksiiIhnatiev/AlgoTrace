@@ -113,10 +113,47 @@ namespace AlgoTrace.Server.Models.DTO.Analysis
         public List<object> MatchedBlocks { get; set; } = new();
     }
 
+    public class EvidenceToken
+    {
+        [JsonPropertyName("value")]
+        public string Value { get; set; }
+
+        [JsonPropertyName("line")]
+        public int Line { get; set; }
+
+        [JsonPropertyName("start_index")]
+        public int StartIndex { get; set; }
+
+        [JsonPropertyName("end_index")]
+        public int EndIndex { get; set; }
+    }
+
+    public class SequenceOccurrence
+    {
+        [JsonPropertyName("submission")]
+        public string Submission { get; set; }
+
+        [JsonPropertyName("tokens")]
+        public List<EvidenceToken> Tokens { get; set; } = new();
+    }
+
+    public class MatchedSequence
+    {
+        [JsonPropertyName("sequence_id")]
+        public string SequenceId { get; set; }
+
+        [JsonPropertyName("type")]
+        public string Type { get; set; }
+
+        [JsonPropertyName("occurrences")]
+        public List<SequenceOccurrence> Occurrences { get; set; } = new();
+    }
+
+    // Обновленная главная модель доказательств
     public class TokenEvidence
     {
-        [JsonPropertyName("matched_hashes")]
-        public List<object> MatchedHashes { get; set; } = new();
+        [JsonPropertyName("matched_sequences")]
+        public List<MatchedSequence> MatchedSequences { get; set; } = new();
     }
 
     public class MetricEvidence

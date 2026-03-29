@@ -1,5 +1,7 @@
 using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO.Analysis;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace AlgoTrace.Server.Algorithms.Token
 {
@@ -33,25 +35,44 @@ namespace AlgoTrace.Server.Algorithms.Token
 
             similarityScore = union > 0 ? (intersection / union) * 100 : 0;
 
-            return new List<DetailedMatch>
+            var matches = new List<DetailedMatch>();
+            var commonTokens = set1.Intersect(set2).ToList();
+
+            if (commonTokens.Any())
             {
-                new DetailedMatch
+                string severity = similarityScore > 80 ? "high" : "low";
+                int matchId = 6000;
+
+                var sourceDict = sourceTokens.GroupBy(t => t.Value).ToDictionary(g => g.Key, g => g.ToList());
+                var targetDict = targetTokens.GroupBy(t => t.Value).ToDictionary(g => g.Key, g => g.ToList());
+
+                foreach (var tokenValue in commonTokens)
                 {
-                    Id = 5001,
-                    Type = "Token Vocabulary Similarity",
-                    Severity = similarityScore > 80 ? "high" : "low",
-                    LeftLines = new List<int>
+                    var sTokens = sourceDict[tokenValue];
+                    var tTokens = targetDict[tokenValue];
+
+                    matches.Add(new DetailedMatch
                     {
-                        sourceTokens.First().Line,
-                        sourceTokens.Last().Line,
-                    },
-                    RightLines = new List<int>
-                    {
-                        targetTokens.First().Line,
-                        targetTokens.Last().Line,
-                    },
-                },
-            };
+                        Id = matchId++,
+                        Type = "Token Vocabulary Similarity",
+                        Severity = severity,
+                        LeftLines = new List<int>
+                            {
+                                sTokens.First().Line,
+                                sTokens.Last().Line
+                            },
+                        RightLines = new List<int>
+                            {
+                                tTokens.First().Line,
+                                tTokens.Last().Line
+                            },
+                        LeftTokens = sTokens,
+                        RightTokens = tTokens
+                    });
+                }
+            }
+
+            return matches;
         }
     }
 }

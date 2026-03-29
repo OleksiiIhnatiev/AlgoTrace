@@ -220,30 +220,44 @@ namespace AlgoTrace.Server.Services
                 count++;
 
                 var evidence = new TokenEvidence();
+
                 foreach (var match in matches)
                 {
-                    evidence.MatchedHashes.Add(
-                        new
+                    if (match.LeftTokens == null || match.RightTokens == null || !match.LeftTokens.Any() || !match.RightTokens.Any())
+                        continue;
+
+                    var matchedSequence = new MatchedSequence
+                    {
+                        SequenceId = match.Id.ToString(),
+                        Type = match.Type,
+                        Occurrences = new List<SequenceOccurrence>
+                {
+                    new SequenceOccurrence
+                    {
+                        Submission = "a",
+                        Tokens = match.LeftTokens.Select(t => new EvidenceToken
                         {
-                            hash_value = match.Id.ToString(),
-                            token_sequence = match.Type,
-                            occurrences = new[]
-                            {
-                                new
-                                {
-                                    submission = "a",
-                                    token_start_index = match.LeftLines.FirstOrDefault(),
-                                    token_end_index = match.LeftLines.LastOrDefault(),
-                                },
-                                new
-                                {
-                                    submission = "b",
-                                    token_start_index = match.RightLines.FirstOrDefault(),
-                                    token_end_index = match.RightLines.LastOrDefault(),
-                                },
-                            },
-                        }
-                    );
+                            Value = t.Value,
+                            Line = t.Line,
+                            StartIndex = t.StartIndex,
+                            EndIndex = t.EndIndex
+                        }).ToList()
+                    },
+                    new SequenceOccurrence
+                    {
+                        Submission = "b",
+                        Tokens = match.RightTokens.Select(t => new EvidenceToken
+                        {
+                            Value = t.Value,
+                            Line = t.Line,
+                            StartIndex = t.StartIndex,
+                            EndIndex = t.EndIndex
+                        }).ToList()
+                    }
+                }
+                    };
+
+                    evidence.MatchedSequences.Add(matchedSequence);
                 }
 
                 categoryResult.Algorithms.Add(
@@ -256,8 +270,10 @@ namespace AlgoTrace.Server.Services
                     }
                 );
             }
+
             categoryResult.CategorySimilarityScore =
                 count > 0 ? Math.Round(totalScore / count, 2) : 0;
+
             return categoryResult;
         }
 
@@ -473,34 +489,65 @@ namespace AlgoTrace.Server.Services
         {
             var tokens = new List<TokenInfo>();
 
-            var pattern =
-                @"(@""(?:[^""]|"""")*""|""(?:\\.|[^\\""])*""|'(?:\\.|[^\\'])*'|`(?:\\.|[^\\`])*`|//.*?$|/\*[\s\S]*?\*/|#.*?$)";
-            string normalized = Regex.Replace(
-                code,
-                pattern,
-                match =>
-                {
-                    if (match.Value.StartsWith("/") || match.Value.StartsWith("#"))
-                        return new string('\n', match.Value.Count(c => c == '\n'));
-                    return " STR ";
-                },
-                RegexOptions.Multiline
-            );
+            // Добавлена новая группа <Symbol> для захвата всех операторов и знаков препинания.
+            // Теперь скобки, математика и логика не будут исчезать из отпечатков.
+            var pattern = @"(?<Comment>//.*?$|/\*[\s\S]*?\*/|#.*?$)|(?<String>@""(?:[^""]|"""")*""|""(?:\\.|[^\\""])*""|'(?:\\.|[^\\'])*'|`(?:\\.|[^\\`])*`)|(?<Number>\b\d+(?:\.\d+)?\b)|(?<Word>[a-zA-Z_][a-zA-Z0-9_]*)|(?<Symbol>[{}()[\].,;:+\-*/%&|^!=<>?~]+)";
 
-            normalized = Regex.Replace(normalized, @"\b\d+\b", " NUM ");
-            normalized = Regex.Replace(
-                normalized,
-                @"\b(if|else|for|while|return|class|public|private|static|int|string|void|var)\b",
-                " KEY "
-            );
-            normalized = Regex.Replace(normalized, @"[a-zA-Z_][a-zA-Z0-9_]*", " ID ");
-            var words = normalized.Split(
-                new[] { ' ', '\t', '\n', '\r', '{', '}', '(', ')', ';', ',' },
-                StringSplitOptions.RemoveEmptyEntries
-            );
-            int line = 1;
-            foreach (var word in words)
-                tokens.Add(new TokenInfo { Value = word, Line = line++ });
+            var lineStarts = new List<int> { 0 };
+            for (int i = 0; i < code.Length; i++)
+            {
+                if (code[i] == '\n') lineStarts.Add(i + 1);
+            }
+
+            var keywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    "if", "else", "elif", "for", "while", "return", "class", "public", "private", "protected",
+                    "static", "int", "string", "void", "var", "let", "const", "function", "def", "bool", "boolean",
+                    "import", "using", "include", "namespace", "package", "new", "switch", "case", "default", "break"
+                };
+
+            var matches = Regex.Matches(code, pattern, RegexOptions.Multiline);
+
+            foreach (Match match in matches)
+            {
+                if (match.Groups["Comment"].Success)
+                    continue;
+
+                string tokenValue = "";
+
+                if (match.Groups["String"].Success)
+                {
+                    tokenValue = "STR";
+                }
+                else if (match.Groups["Number"].Success)
+                {
+                    tokenValue = "NUM";
+                }
+                else if (match.Groups["Word"].Success)
+                {
+                    tokenValue = keywords.Contains(match.Value) ? match.Value.ToLower() : "ID";
+                }
+                else if (match.Groups["Symbol"].Success)
+                {
+                    tokenValue = match.Value;
+                }
+
+                if (!string.IsNullOrEmpty(tokenValue))
+                {
+                    int lineIndex = lineStarts.BinarySearch(match.Index);
+                    if (lineIndex < 0)
+                        lineIndex = ~lineIndex - 1;
+
+                    tokens.Add(new TokenInfo
+                    {
+                        Value = tokenValue,
+                        Line = lineIndex + 1,
+                        StartIndex = match.Index,
+                        EndIndex = match.Index + match.Length
+                    });
+                }
+            }
+
             return tokens;
         }
     }

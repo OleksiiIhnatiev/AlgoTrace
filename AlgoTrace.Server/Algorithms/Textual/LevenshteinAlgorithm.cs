@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO.Analysis;
 using AlgoTrace.Server.Utils;
@@ -10,8 +11,6 @@ namespace AlgoTrace.Server.Algorithms.Textual
         public string Key => "levenshtein";
         public string Name => "Levenshtein Line Comparison";
 
-        // Lines longer than this will be skipped to prevent CPU/Memory exhaustion
-        // Minified files often have single lines with tens of thousands of characters.
         private const int MaxLineLength = 1000;
 
         public List<DetailedMatch> Execute(string source, string target, out double similarityScore)
@@ -27,21 +26,12 @@ namespace AlgoTrace.Server.Algorithms.Textual
                 return matches;
             }
 
-            int maxLines = Math.Max(sLines.Length, tLines.Length);
-            if (maxLines == 0)
+            if (sLines.Length > 2500 || tLines.Length > 2500)
             {
                 similarityScore = 0.0;
                 return matches;
             }
 
-            // Fallback for extremely large files to prevent CPU locking
-            if (maxLines > 2500)
-            {
-                similarityScore = 0.0;
-                return matches;
-            }
-
-            // Pre-normalize all lines to avoid calling Regex.Replace O(N^2) times
             var sNorms = new string[sLines.Length];
             for (int i = 0; i < sLines.Length; i++)
                 sNorms[i] = SourceNormalizer.NormalizeLine(sLines[i]);
@@ -50,20 +40,22 @@ namespace AlgoTrace.Server.Algorithms.Textual
             for (int j = 0; j < tLines.Length; j++)
                 tNorms[j] = SourceNormalizer.NormalizeLine(tLines[j]);
 
+            int validSourceLines = 0;
+
             for (int i = 0; i < sNorms.Length; i++)
             {
                 string sNorm = sNorms[i];
-                if (sNorm.Length < 10 || sNorm.Length > MaxLineLength)
+                if (sNorm.Length < 5 || sNorm.Length > MaxLineLength)
                     continue;
+
+                validSourceLines++;
 
                 for (int j = 0; j < tNorms.Length; j++)
                 {
                     string tNorm = tNorms[j];
-                    if (tNorm.Length < 10 || tNorm.Length > MaxLineLength)
+                    if (tNorm.Length < 5 || tNorm.Length > MaxLineLength)
                         continue;
 
-                    // Quick heuristic: length difference must be within 15%
-                    // for the ratio to possibly be > 0.85
                     int maxLen = Math.Max(sNorm.Length, tNorm.Length);
                     if (Math.Abs(sNorm.Length - tNorm.Length) > maxLen * 0.15)
                         continue;
@@ -89,7 +81,15 @@ namespace AlgoTrace.Server.Algorithms.Textual
                 }
             }
 
-            similarityScore = (double)matchCount / maxLines * 100;
+            if (validSourceLines == 0)
+            {
+                similarityScore = 0.0;
+            }
+            else
+            {
+                similarityScore = (double)matchCount / validSourceLines * 100;
+            }
+
             return matches;
         }
 
@@ -103,7 +103,6 @@ namespace AlgoTrace.Server.Algorithms.Textual
             if (m == 0)
                 return n;
 
-            // Space optimization: Use 2 rows instead of an N*M matrix
             int[] v0 = new int[m + 1];
             int[] v1 = new int[m + 1];
 
@@ -122,13 +121,12 @@ namespace AlgoTrace.Server.Algorithms.Textual
                     v1[j + 1] = Math.Min(Math.Min(v1[j] + 1, v0[j + 1] + 1), v0[j] + cost);
                 }
 
-                // Swap vectors to reuse memory for the next outer iteration
                 int[] temp = v0;
                 v0 = v1;
                 v1 = temp;
             }
 
-            return v0[m]; // After the final swap, v0 holds the result
+            return v0[m];
         }
     }
 }
