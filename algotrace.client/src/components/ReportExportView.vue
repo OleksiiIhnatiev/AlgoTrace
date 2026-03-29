@@ -3,7 +3,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { analysisState } from '@/services/analysis.service';
 import { computed, onMounted, ref, nextTick } from 'vue';
 import InteractiveGraph from './InteractiveGraph.vue';
-import type { Node as VisNode, Edge as VisEdge } from 'vis-network';
+import type { Node as VisNode, Edge as VisEdge, Options as VisOptions } from 'vis-network';
 import html2pdf from 'html2pdf.js';
 
 interface MatchedBlock { start_line_a: number; end_line_a: number; start_line_b: number; end_line_b: number; content_a: string; content_b: string; file_a?: string; file_b?: string; }
@@ -15,7 +15,7 @@ interface GraphMatch { type: string; severity: string; left_lines: number[]; rig
 interface CFGNode { id: string; line: number; content: string; type: string; }
 interface CFGEdge { source: string; target: string; type?: string; }
 interface CFGGraph { nodes: CFGNode[]; edges: CFGEdge[]; }
-interface Evidence { matched_blocks?: MatchedBlock[]; matched_hashes?: MatchedHash[]; matched_subtrees?: SubtreeMatch[]; matches?: GraphMatch[]; graph_a?: CFGGraph; graph_b?: CFGGraph; metrics_a?: Record<string, number>; metrics_b?: Record<string, number>; conclusion?: string; length?: number; [index: number]: ASTMatch; }
+interface Evidence { matched_blocks?: MatchedBlock[]; matched_hashes?: MatchedHash[]; matched_subtrees?: SubtreeMatch[]; full_nodes_a?: ASTNode[]; full_nodes_b?: ASTNode[]; matches?: GraphMatch[]; graph_a?: CFGGraph; graph_b?: CFGGraph; metrics_a?: Record<string, number>; metrics_b?: Record<string, number>; conclusion?: string; length?: number; [index: number]: ASTMatch; }
 interface Algorithm { method: string; similarity_score: number; evidence_type: string; evidence: Evidence; }
 interface Category { category_name: string; category_similarity_score: number; algorithms: Algorithm[]; }
 interface SourceFiles { name_a: string; file_a: string; name_b: string; file_b: string; }
@@ -158,14 +158,43 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
   return hash.occurrences?.some(o => o.submission === sub);
 };
 
-const buildASTVisData = (nodes: ASTNode[]): { nodes: VisNode[], edges: VisEdge[] } => {
+const getMatchedASTNodeIds = (evidence: Evidence | undefined, fileId: 'a' | 'b'): Set<string> => {
+  const ids = new Set<string>();
+  if (evidence?.matched_subtrees) {
+    evidence.matched_subtrees.forEach(st => {
+      const nodes = fileId === 'a' ? st.nodes_a : st.nodes_b;
+      if (nodes) nodes.forEach(n => ids.add(n.id));
+    });
+  }
+  return ids;
+};
+
+const buildASTVisData = (nodes: ASTNode[], matchedNodeIds?: Set<string>): { nodes: VisNode[], edges: VisEdge[] } => {
   const visNodes: VisNode[] = [];
   const visEdges: VisEdge[] = [];
   if (!nodes) return { nodes: visNodes, edges: visEdges };
   nodes.forEach((n: ASTNode) => {
-    visNodes.push({ id: n.id, label: (n.label || '').replace(/[\[\]{}()<>]/g, ' ') });
+    const nodeObj: VisNode = { id: n.id, label: (n.label || '').replace(/[\[\]{}()<>]/g, ' ') };
+    const isMatched = matchedNodeIds && matchedNodeIds.has(n.id);
+    if (isMatched) {
+      nodeObj.color = {
+          background: '#e8f5e9',
+          border: '#4caf50',
+          highlight: { background: '#c8e6c9', border: '#4caf50' }
+      };
+      nodeObj.font = { color: '#2e7d32' };
+      nodeObj.borderWidth = 2;
+    }
+    visNodes.push(nodeObj);
     if (n.children && Array.isArray(n.children)) {
-      n.children.forEach((cId: string) => visEdges.push({ from: n.id, to: cId }));
+      n.children.forEach((cId: string) => {
+        const edgeObj: VisEdge = { from: n.id, to: cId };
+        if (isMatched && matchedNodeIds.has(cId)) {
+            edgeObj.color = { color: '#4caf50' };
+            edgeObj.width = 2;
+        }
+        visEdges.push(edgeObj);
+      });
     }
   });
   return { nodes: visNodes, edges: visEdges };
@@ -186,7 +215,7 @@ const buildCFGVisData = (graph: CFGGraph | undefined): { nodes: VisNode[], edges
   return { nodes: visNodes, edges: visEdges };
 };
 
-const printGraphOptions = {
+const printGraphOptions: VisOptions = {
   autoResize: true,
   interaction: {
     dragNodes: false,
@@ -231,9 +260,9 @@ const downloadPdf = async () => {
     const opt = {
       margin:       [10, 0, 10, 0] as [number, number, number, number],
       filename:     `AlgoTrace_Report_${report.value.analysis_id}.pdf`,
-      image:        { type: 'jpeg', quality: 0.98 },
+      image:        { type: 'jpeg' as const, quality: 0.98 },
       html2canvas:  { scale: 1.2, useCORS: true, scrollY: 0, backgroundColor: '#ffffff' },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      jsPDF:        { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
       pagebreak:    { mode: ['css', 'legacy'], avoid: '.avoid-break' }
     };
 
@@ -386,7 +415,42 @@ const downloadPdf = async () => {
                      <div v-else class="p-3 text-muted small text-center bg-white">Структурний збіг для всього файлу</div>
                   </div>
               </div>
-              <div v-else-if="algo.evidence?.matched_subtrees">
+              <template v-else>
+              <div v-if="algo.evidence?.full_nodes_a && algo.evidence?.full_nodes_b">
+                 <div class="html2pdf__page-break"></div> <!-- Примусовий розрив сторінки для AST-графів -->
+                 <div class="mb-4 border rounded-4 overflow-hidden shadow-sm p-3 bg-white">
+                    <h6 class="fw-bold text-dark mb-3"><i class="bi bi-diagram-3 text-primary me-2"></i> Повне AST-дерево</h6>
+                    <div class="row g-4">
+                      <div class="col-12 avoid-break">
+                         <div class="border rounded-3 h-100">
+                           <div class="bg-light px-3 py-2 border-bottom fw-bold text-center">Файл 1 (Вузли)</div>
+                           <div class="p-2 graph-print-container d-flex justify-content-center bg-white border-bottom">
+                             <InteractiveGraph :graph-data="buildASTVisData(algo.evidence.full_nodes_a, getMatchedASTNodeIds(algo.evidence, 'a'))" :options="printGraphOptions" height="500px" class="border-0 shadow-none" />
+                           </div>
+                           <ul class="list-group list-group-flush small m-0">
+                             <li class="list-group-item px-2 py-1 border-0" v-for="node in algo.evidence.full_nodes_a" :key="node.id">
+                               <span class="text-muted font-monospace me-2">[{{ node.id }}]</span>{{ node.label }}
+                             </li>
+                           </ul>
+                         </div>
+                      </div>
+                      <div class="col-12 avoid-break mt-4">
+                         <div class="border rounded-3 h-100">
+                           <div class="bg-light px-3 py-2 border-bottom fw-bold text-center">Файл 2 (Вузли)</div>
+                           <div class="p-2 graph-print-container d-flex justify-content-center bg-white border-bottom">
+                             <InteractiveGraph :graph-data="buildASTVisData(algo.evidence.full_nodes_b, getMatchedASTNodeIds(algo.evidence, 'b'))" :options="printGraphOptions" height="500px" class="border-0 shadow-none" />
+                           </div>
+                           <ul class="list-group list-group-flush small m-0">
+                             <li class="list-group-item px-2 py-1 border-0" v-for="node in algo.evidence.full_nodes_b" :key="node.id">
+                               <span class="text-muted font-monospace me-2">[{{ node.id }}]</span>{{ node.label }}
+                             </li>
+                           </ul>
+                         </div>
+                      </div>
+                    </div>
+                 </div>
+              </div>
+              <div v-if="algo.evidence?.matched_subtrees">
                  <div class="html2pdf__page-break"></div> <!-- Примусовий розрив сторінки для AST-графів -->
                  <div v-for="(subtree, sIdx) in algo.evidence.matched_subtrees" :key="sIdx" class="mb-4 border rounded-4 overflow-hidden shadow-sm p-3 bg-white">
                     <h6 class="fw-bold text-dark mb-3"><i class="bi bi-diagram-3 text-primary me-2"></i> Збіг піддерева: <span class="text-primary">{{ subtree.node_type }}</span></h6>
@@ -395,7 +459,7 @@ const downloadPdf = async () => {
                          <div class="border rounded-3 h-100">
                            <div class="bg-light px-3 py-2 border-bottom fw-bold text-center">Файл 1 (Вузли)</div>
                            <div class="p-2 graph-print-container d-flex justify-content-center bg-white border-bottom">
-                             <InteractiveGraph :graph-data="buildASTVisData(subtree.nodes_a)" :options="printGraphOptions" height="500px" class="border-0 shadow-none" />
+                             <InteractiveGraph :graph-data="buildASTVisData(subtree.nodes_a, getMatchedASTNodeIds(algo.evidence, 'a'))" :options="printGraphOptions" height="500px" class="border-0 shadow-none" />
                            </div>
                            <ul class="list-group list-group-flush small m-0">
                              <li class="list-group-item px-2 py-1 border-0" v-for="node in subtree.nodes_a" :key="node.id">
@@ -408,7 +472,7 @@ const downloadPdf = async () => {
                          <div class="border rounded-3 h-100">
                            <div class="bg-light px-3 py-2 border-bottom fw-bold text-center">Файл 2 (Вузли)</div>
                            <div class="p-2 graph-print-container d-flex justify-content-center bg-white border-bottom">
-                             <InteractiveGraph :graph-data="buildASTVisData(subtree.nodes_b)" :options="printGraphOptions" height="500px" class="border-0 shadow-none" />
+                             <InteractiveGraph :graph-data="buildASTVisData(subtree.nodes_b, getMatchedASTNodeIds(algo.evidence, 'b'))" :options="printGraphOptions" height="500px" class="border-0 shadow-none" />
                            </div>
                            <ul class="list-group list-group-flush small m-0">
                              <li class="list-group-item px-2 py-1 border-0" v-for="node in subtree.nodes_b" :key="node.id">
@@ -420,6 +484,7 @@ const downloadPdf = async () => {
                     </div>
                  </div>
               </div>
+              </template>
            </div>
 
            <!-- Graph Mapping Unrolled -->

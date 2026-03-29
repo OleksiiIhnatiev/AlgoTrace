@@ -135,6 +135,12 @@ namespace AlgoTrace.Server.Models.DTO.Analysis
     {
         [JsonPropertyName("matched_subtrees")]
         public List<MatchedSubtree> MatchedSubtrees { get; set; } = new();
+
+        [JsonPropertyName("full_nodes_a")]
+        public List<MatchedNodeInfo> FullNodesA { get; set; } = new();
+
+        [JsonPropertyName("full_nodes_b")]
+        public List<MatchedNodeInfo> FullNodesB { get; set; } = new();
     }
 
     public class MatchedSubtree

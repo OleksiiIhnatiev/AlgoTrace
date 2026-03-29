@@ -80,6 +80,8 @@ interface Evidence {
   matched_blocks?: MatchedBlock[];
   matched_hashes?: MatchedHash[];
   matched_subtrees?: SubtreeMatch[];
+  full_nodes_a?: ASTNode[];
+  full_nodes_b?: ASTNode[];
   matches?: GraphMatch[];
   graph_a?: CFGGraph;
   graph_b?: CFGGraph;
@@ -459,30 +461,99 @@ const updateMonacoDecorations = () => {
 
 watch(activeAlgorithm, () => nextTick(updateMonacoDecorations));
 
-const buildASTVisData = (nodes: ASTNode[]): { nodes: VisNode[], edges: VisEdge[] } => {
+const getMatchedASTNodeIds = (evidence: Evidence | undefined, fileId: 'a' | 'b'): Set<string> => {
+  const ids = new Set<string>();
+  if (evidence?.matched_subtrees) {
+    evidence.matched_subtrees.forEach(st => {
+      const nodes = fileId === 'a' ? st.nodes_a : st.nodes_b;
+      if (nodes) nodes.forEach(n => ids.add(n.id));
+    });
+  }
+  return ids;
+};
+
+const buildASTVisData = (nodes: ASTNode[], matchedNodeIds?: Set<string>): { nodes: VisNode[], edges: VisEdge[] } => {
   const visNodes: VisNode[] = [];
   const visEdges: VisEdge[] = [];
   if (!nodes) return { nodes: visNodes, edges: visEdges };
   nodes.forEach((n: ASTNode) => {
-    visNodes.push({ id: n.id, label: (n.label || '').replace(/[\[\]{}()<>]/g, ' ') });
+    const nodeObj: VisNode = { id: n.id, label: (n.label || '').replace(/[\[\]{}()<>]/g, ' ') };
+    
+    const isMatched = matchedNodeIds && matchedNodeIds.has(n.id);
+    if (isMatched) {
+      nodeObj.color = {
+          background: isDarkMode.value ? '#1b5e20' : '#e8f5e9',
+          border: '#4caf50',
+          highlight: { background: isDarkMode.value ? '#2e7d32' : '#c8e6c9', border: '#4caf50' }
+      };
+      nodeObj.font = { color: isDarkMode.value ? '#e8f5e9' : '#2e7d32' };
+      nodeObj.borderWidth = 2;
+    }
+
+    visNodes.push(nodeObj);
     if (n.children && Array.isArray(n.children)) {
-      n.children.forEach((cId: string) => visEdges.push({ from: n.id, to: cId }));
+      n.children.forEach((cId: string) => {
+        const edgeObj: VisEdge = { from: n.id, to: cId };
+        if (isMatched && matchedNodeIds.has(cId)) {
+            edgeObj.color = { color: '#4caf50' };
+            edgeObj.width = 2;
+        }
+        visEdges.push(edgeObj);
+      });
     }
   });
   return { nodes: visNodes, edges: visEdges };
 };
 
-const buildCFGVisData = (graph: CFGGraph | undefined): { nodes: VisNode[], edges: VisEdge[] } => {
+const buildCFGVisData = (graph: CFGGraph | undefined, matches: GraphMatch[] | undefined, fileId: 'a' | 'b'): { nodes: VisNode[], edges: VisEdge[] } => {
   const visNodes: VisNode[] = [];
   const visEdges: VisEdge[] = [];
   if (!graph || !graph.nodes) return { nodes: visNodes, edges: visEdges };
+
+  const matchedLines = new Set<number>();
+  if (matches) {
+    matches.forEach(m => {
+      const lines = fileId === 'a' ? m.left_lines : m.right_lines;
+      if (lines) lines.forEach(l => matchedLines.add(l));
+    });
+  }
+
   graph.nodes.forEach((n: CFGNode) => {
     let content = (n.content || '').replace(/["\\]/g, "'").replace(/[\[\]{}()<>]/g, ' ');
     if (content.length > 40) content = content.substring(0, 40) + '...';
-    visNodes.push({ id: n.id, label: `[L${n.line}]\n${content}`, group: n.type });
+    
+    const isMatched = matchedLines.has(n.line);
+    const nodeObj: VisNode = { id: n.id, label: `[L${n.line}]\n${content}` };
+
+    if (isMatched) {
+        nodeObj.color = {
+            background: isDarkMode.value ? '#1b5e20' : '#e8f5e9',
+            border: '#4caf50',
+            highlight: { background: isDarkMode.value ? '#2e7d32' : '#c8e6c9', border: '#4caf50' }
+        };
+        nodeObj.font = { color: isDarkMode.value ? '#e8f5e9' : '#2e7d32' };
+        nodeObj.borderWidth = 3;
+    }
+
+    visNodes.push(nodeObj);
   });
   if (graph.edges && Array.isArray(graph.edges)) {
-    graph.edges.forEach((e: CFGEdge) => visEdges.push({ from: e.source, to: e.target, label: e.type || '' }));
+    graph.edges.forEach((e: CFGEdge) => {
+        const sourceNode = graph.nodes.find(n => n.id.toString() === e.source.toString());
+        const targetNode = graph.nodes.find(n => n.id.toString() === e.target.toString());
+        
+        const sourceMatched = sourceNode && matchedLines.has(sourceNode.line);
+        const targetMatched = targetNode && matchedLines.has(targetNode.line);
+        
+        const edgeObj: VisEdge = { from: e.source, to: e.target, label: e.type || '' };
+        
+        if (sourceMatched && targetMatched) {
+            edgeObj.color = { color: '#4caf50', highlight: '#388e3c' };
+            edgeObj.width = 3;
+        }
+        
+        visEdges.push(edgeObj);
+    });
   }
   return { nodes: visNodes, edges: visEdges };
 };
@@ -848,8 +919,54 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                               </div>
                             </div>
                           </div>
+                  </div>
+                  <template v-else>
+                      <div v-if="activeAlgorithm.evidence?.full_nodes_a && activeAlgorithm.evidence?.full_nodes_b" class="row g-4 mt-2">
+                          <div class="col-12">
+                            <div class="p-4 border rounded-4 bg-white shadow-sm">
+                              <div class="fw-bold mb-4 fs-5 text-dark border-bottom pb-3">
+                                <i class="bi bi-diagram-3 text-primary me-2"></i> Повне AST-дерево
+                              </div>
+                              <div class="row g-4">
+                                <div class="col-md-6">
+                                  <div class="card h-100 border-0 bg-transparent shadow-none">
+                                    <div class="card-header bg-light text-dark fw-bold py-3 border rounded-top-3"><i class="bi bi-diagram-2 me-2"></i> AST (Файл 1)</div>
+                                    <div class="p-3 border-bottom border-start border-end bg-white d-flex justify-content-center">
+                                      <InteractiveGraph :graph-data="buildASTVisData(activeAlgorithm.evidence.full_nodes_a, getMatchedASTNodeIds(activeAlgorithm.evidence, 'a'))" />
+                                    </div>
+                                    <div class="card-body p-0 custom-scrollbar bg-white border border-top-0 rounded-bottom-3" style="max-height: 200px; overflow-y: auto;">
+                                      <ul class="list-group list-group-flush small">
+                                         <li class="list-group-item bg-transparent text-dark border-bottom py-2" v-for="node in activeAlgorithm.evidence.full_nodes_a" :key="node.id">
+                                            <i class="bi bi-record-circle text-primary me-3" style="font-size: 0.7rem;"></i>
+                                            <span class="fw-medium text-dark">{{ node.label }}</span>
+                                            <span class="text-muted ms-2 font-monospace" style="font-size: 0.7rem;">[{{ node.id }}]</span>
+                                         </li>
+                                      </ul>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div class="col-md-6">
+                                  <div class="card h-100 border-0 bg-transparent shadow-none">
+                                    <div class="card-header bg-light text-dark fw-bold py-3 border rounded-top-3"><i class="bi bi-diagram-2-fill me-2 text-danger"></i> AST (Файл 2)</div>
+                                    <div class="p-3 border-bottom border-start border-end bg-white d-flex justify-content-center">
+                                      <InteractiveGraph :graph-data="buildASTVisData(activeAlgorithm.evidence.full_nodes_b, getMatchedASTNodeIds(activeAlgorithm.evidence, 'b'))" />
+                                    </div>
+                                    <div class="card-body p-0 custom-scrollbar bg-white border border-top-0 rounded-bottom-3" style="max-height: 200px; overflow-y: auto;">
+                                      <ul class="list-group list-group-flush small">
+                                         <li class="list-group-item bg-transparent text-dark border-bottom py-2" v-for="node in activeAlgorithm.evidence.full_nodes_b" :key="node.id">
+                                            <i class="bi bi-record-circle text-danger me-3" style="font-size: 0.7rem;"></i>
+                                            <span class="fw-medium text-dark">{{ node.label }}</span>
+                                            <span class="text-muted ms-2 font-monospace" style="font-size: 0.7rem;">[{{ node.id }}]</span>
+                                         </li>
+                                      </ul>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                       </div>
-                      <div v-else-if="activeAlgorithm.evidence?.matched_subtrees" class="row g-4 mt-2">
+                      <div v-if="activeAlgorithm.evidence?.matched_subtrees" class="row g-4 mt-2">
                           <div class="col-12" v-for="(subtree, sIdx) in activeAlgorithm.evidence.matched_subtrees" :key="sIdx">
                             <div class="p-4 border rounded-4 bg-white shadow-sm">
                               <div class="fw-bold mb-4 fs-5 text-dark border-bottom pb-3">
@@ -860,7 +977,7 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                                   <div class="card h-100 border-0 bg-transparent shadow-none">
                                     <div class="card-header bg-light text-dark fw-bold py-3 border rounded-top-3"><i class="bi bi-diagram-2 me-2"></i> AST Вузли (Файл 1)</div>
                                     <div class="p-3 border-bottom border-start border-end bg-white d-flex justify-content-center">
-                                      <InteractiveGraph :graph-data="buildASTVisData(subtree.nodes_a)" />
+                                      <InteractiveGraph :graph-data="buildASTVisData(subtree.nodes_a, getMatchedASTNodeIds(activeAlgorithm.evidence, 'a'))" />
                                     </div>
                                     <div class="card-body p-0 custom-scrollbar bg-white border border-top-0 rounded-bottom-3" style="max-height: 200px; overflow-y: auto;">
                                       <ul class="list-group list-group-flush small">
@@ -877,7 +994,7 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                                   <div class="card h-100 border-0 bg-transparent shadow-none">
                                     <div class="card-header bg-light text-dark fw-bold py-3 border rounded-top-3"><i class="bi bi-diagram-2-fill me-2 text-danger"></i> AST Вузли (Файл 2)</div>
                                     <div class="p-3 border-bottom border-start border-end bg-white d-flex justify-content-center">
-                                      <InteractiveGraph :graph-data="buildASTVisData(subtree.nodes_b)" />
+                                      <InteractiveGraph :graph-data="buildASTVisData(subtree.nodes_b, getMatchedASTNodeIds(activeAlgorithm.evidence, 'b'))" />
                                     </div>
                                     <div class="card-body p-0 custom-scrollbar bg-white border border-top-0 rounded-bottom-3" style="max-height: 200px; overflow-y: auto;">
                                       <ul class="list-group list-group-flush small">
@@ -894,6 +1011,7 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                             </div>
                           </div>
                       </div>
+                  </template>
                    </div>
 
                    <div v-else-if="activeAlgorithm.evidence_type === 'graph_mapping'">
@@ -929,7 +1047,7 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                                <i class="bi bi-box me-2 text-primary"></i> Вузли графа 1
                              </div>
                              <div class="p-3 border-bottom bg-white d-flex justify-content-center">
-                                <InteractiveGraph :graph-data="buildCFGVisData(activeAlgorithm.evidence.graph_a)" />
+                                <InteractiveGraph :graph-data="buildCFGVisData(activeAlgorithm.evidence.graph_a, activeAlgorithm.evidence.matches, 'a')" />
                              </div>
                              <div class="card-body p-0 custom-scrollbar bg-white" style="max-height: 350px; overflow-y: auto;">
                                <ul class="list-group list-group-flush">
@@ -949,7 +1067,7 @@ const hasOccurrence = (hash: MatchedHash, sub: 'a' | 'b') => {
                                <i class="bi bi-box me-2 text-danger"></i> Вузли графа 2
                              </div>
                              <div class="p-3 border-bottom bg-white d-flex justify-content-center">
-                                <InteractiveGraph :graph-data="buildCFGVisData(activeAlgorithm.evidence.graph_b)" />
+                                <InteractiveGraph :graph-data="buildCFGVisData(activeAlgorithm.evidence.graph_b, activeAlgorithm.evidence.matches, 'b')" />
                              </div>
                              <div class="card-body p-0 custom-scrollbar bg-white" style="max-height: 350px; overflow-y: auto;">
                                <ul class="list-group list-group-flush">

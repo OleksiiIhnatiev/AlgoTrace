@@ -96,6 +96,14 @@ namespace AlgoTrace.Server.Algorithms.Tree
 
             TraverseAndMatch(treeA);
 
+            var allNodesA = new List<UniversalNode>();
+            CollectSubtreeNodes(treeA, allNodesA);
+            evidence.FullNodesA = allNodesA.Select(n => CreateNodeInfo(n, "a")).ToList();
+
+            var allNodesB = new List<UniversalNode>();
+            CollectSubtreeNodes(treeB, allNodesB);
+            evidence.FullNodesB = allNodesB.Select(n => CreateNodeInfo(n, "b")).ToList();
+
             double score = ((double)matchedNodesCount / totalNodesA) * 100.0;
             return Math.Round(Math.Min(100.0, score), 2);
         }
