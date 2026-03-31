@@ -96,14 +96,73 @@ const report = computed<Report | null>(() => {
   };
 });
 
-const globalScore = computed(() => {
-  return report.value?.global_similarity_score ? Math.round(report.value.global_similarity_score * 100) : 0;
+const similarityStats = computed(() => {
+  const results = report.value?.categories_results;
+  if (!results) return null;
+
+  const allAlgos: { name: string, score: number }[] = [];
+
+  results.forEach(cat => {
+    if (cat.algorithms) {
+      cat.algorithms.forEach(algo => {
+        allAlgos.push({
+          name: formatMethodName(algo.method),
+          score: (algo.similarity_score ?? 0) * 100
+        });
+      });
+    }
+  });
+
+  const count = allAlgos.length;
+  if (count === 0) return null;
+
+  allAlgos.sort((a, b) => a.score - b.score);
+
+  const firstMatch = allAlgos[0];
+  const lastMatch = allAlgos[count - 1];
+
+  if (!firstMatch || !lastMatch) return null;
+
+  const minScore = firstMatch.score;
+  const maxScore = lastMatch.score;
+
+  const minAlgos = allAlgos
+    .filter(a => Math.abs(a.score - minScore) < 0.01)
+    .map(a => a.name);
+
+  const maxAlgos = allAlgos
+    .filter(a => Math.abs(a.score - maxScore) < 0.01)
+    .map(a => a.name);
+
+  const sum = allAlgos.reduce((acc, curr) => acc + curr.score, 0);
+  const avgScore = sum / count;
+
+  let medianScore = 0;
+  const mid = Math.floor(count / 2);
+
+  const midAlgo = allAlgos[mid];
+  const prevMidAlgo = allAlgos[mid - 1];
+
+  if (count % 2 === 0 && midAlgo && prevMidAlgo) {
+    medianScore = (prevMidAlgo.score + midAlgo.score) / 2;
+  } else if (midAlgo) {
+    medianScore = midAlgo.score;
+  }
+
+  return {
+    min: Math.round(minScore),
+    minAlgos,
+    max: Math.round(maxScore),
+    maxAlgos,
+    avg: Math.round(avgScore),
+    median: Math.round(medianScore)
+  };
 });
 
 const getScoreColorHex = (score: number) => {
-  if (score < 30) return '#10b981';
-  if (score < 70) return '#f59e0b';
-  return '#ef4444';
+  if (score < 30) return '#198754'; // Bootstrap success
+  if (score < 70) return '#fd7e14'; // Bootstrap orange
+  return '#dc3545'; // Bootstrap danger
 };
 
 const formatScore = (score: number) => Math.round((score || 0) * 100) + '%';
@@ -114,7 +173,7 @@ const formatCategoryName = (name: string) => {
 };
 
 const formatMethodName = (method: string) => {
-  const map: Record<string, string> = { 'levenshtein': 'Відстань Левенштейна', 'line_matching': 'Порядкове Порівняння', 'rabin_karp': 'Алгоритм Рабіна-Карпа', 'ngram_search': 'Пошук за N-грамами', 'jaccard_token': 'Токени Джаккарда', 'winnowing': 'Вінновінг (Winnowing)', 'ast_hashing': 'Хешування AST', 'ast_compare': 'Пряме Порівняння AST', 'subtree_isomorphism': 'Ізоморфізм Піддерев', 'cfg': 'Граф потоку керування (CFG)', 'pdg': 'Граф залежностей даних (PDG)', 'subgraph_isomorphism': 'Ізоморфізм підграфів', 'halstead': 'Метрики Холстеда', 'mccabe': 'Складність Маккейба' };
+  const map: Record<string, string> = { 'levenshtein': 'Відстань Левенштейна', 'line_matching': 'Порядкове порівняння', 'rabin_karp': 'Алгоритм Рабіна-Карпа', 'ngram_search': 'Пошук за N-грамами', 'jaccard_token': 'Токени Джаккарда', 'winnowing': 'Вінновінг (Winnowing)', 'ast_hashing': 'Хешування AST', 'ast_compare': 'Пряме порівняння AST', 'subtree_isomorphism': 'Ізоморфізм піддерев', 'cfg': 'Граф потоку керування (CFG)', 'pdg': 'Граф залежностей даних (PDG)', 'subgraph_isomorphism': 'Ізоморфізм підграфів', 'halstead': 'Метрики Холстеда', 'mccabe': 'Складність Маккейба' };
   return map[method] || method.replace(/_/g, ' ');
 };
 
@@ -182,8 +241,8 @@ const buildASTVisData = (nodes: ASTNode[], matchedNodeIds?: Set<string>): { node
           border: '#4caf50',
           highlight: { background: '#c8e6c9', border: '#4caf50' }
       };
-      nodeObj.font = { color: '#2e7d32' };
-      nodeObj.borderWidth = 2;
+      nodeObj.font = { color: '#1b5e20' };
+      nodeObj.borderWidth = 1;
     }
     visNodes.push(nodeObj);
     if (n.children && Array.isArray(n.children)) {
@@ -217,51 +276,37 @@ const buildCFGVisData = (graph: CFGGraph | undefined): { nodes: VisNode[], edges
 
 const printGraphOptions: VisOptions = {
   autoResize: true,
-  interaction: {
-    dragNodes: false,
-    dragView: false,
-    zoomView: false,
-    selectable: false
-  },
-  physics: {
-    enabled: true,
-    hierarchicalRepulsion: { nodeDistance: 200 }
-  },
+  interaction: { dragNodes: false, dragView: false, zoomView: false, selectable: false },
+  physics: { enabled: true, hierarchicalRepulsion: { nodeDistance: 160 } },
   nodes: {
     shape: 'box',
-    margin: { top: 15, right: 15, bottom: 15, left: 15 },
-    font: { color: '#212529', face: 'monospace', size: 18 },
-    color: { background: '#ffffff', border: '#ced4da' },
-    borderWidth: 2,
+    margin: { top: 8, right: 10, bottom: 8, left: 10 },
+    font: { color: '#333', face: 'monospace', size: 14 },
+    color: { background: '#fff', border: '#ccc' },
+    borderWidth: 1,
     shadow: false
   },
   edges: {
     arrows: 'to',
-    color: { color: '#adb5bd' },
+    color: { color: '#999' },
     smooth: { enabled: true, type: 'cubicBezier', roundness: 0.5 },
-    width: 2
+    width: 1
   },
-  layout: {
-    hierarchical: { enabled: true, direction: 'UD', sortMethod: 'directed', levelSeparation: 150 }
-  }
+  layout: { hierarchical: { enabled: true, direction: 'UD', sortMethod: 'directed', levelSeparation: 100 } }
 };
 
 const downloadPdf = async () => {
   if (!reportContainer.value || !report.value) return;
-
   isGenerating.value = true;
-
-  if (!props.hiddenRender) {
-    window.scrollTo(0, 0);
-  }
-  await new Promise(resolve => setTimeout(resolve, 1500));
+  if (!props.hiddenRender) window.scrollTo(0, 0);
+  await new Promise(resolve => setTimeout(resolve, 1000));
 
   try {
     const opt = {
-      margin:       [10, 0, 10, 0] as [number, number, number, number],
+      margin:       [10, 10, 10, 10] as [number, number, number, number],
       filename:     `AlgoTrace_Report_${report.value.analysis_id}.pdf`,
       image:        { type: 'jpeg' as const, quality: 0.98 },
-      html2canvas:  { scale: 1.2, useCORS: true, scrollY: 0, backgroundColor: '#ffffff' },
+      html2canvas:  { scale: 1.5, useCORS: true, scrollY: 0, backgroundColor: '#ffffff' },
       jsPDF:        { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
       pagebreak:    { mode: ['css', 'legacy'], avoid: '.avoid-break' }
     };
@@ -278,311 +323,244 @@ const downloadPdf = async () => {
 </script>
 
 <template>
-  <div class="print-container bg-white" :class="{ 'min-vh-100': !hiddenRender }" v-if="report">
-    <!-- Controls (Hidden in print) -->
-    <div v-if="!hiddenRender" class="no-print p-3 bg-light border-bottom sticky-top d-flex justify-content-between align-items-center z-3 shadow-sm">
-      <button @click="router.back()" class="btn btn-outline-secondary rounded-pill px-4 fw-bold">
-        <i class="bi bi-arrow-left me-2"></i> Назад до результатів
+  <div class="print-container bg-light" :class="{ 'min-vh-100 py-4': !hiddenRender }" v-if="report">
+    
+    <div v-if="!hiddenRender" class="no-print container mb-4 d-flex justify-content-between align-items-center">
+      <button @click="router.back()" class="btn btn-outline-secondary btn-sm fw-medium">
+        &larr; Назад
       </button>
-      <h5 class="m-0 fw-bold text-dark d-none d-md-block">Попередній перегляд звіту PDF</h5>
-      <button @click="downloadPdf" :disabled="isGenerating" class="btn btn-danger rounded-pill px-4 fw-bold shadow-sm d-flex align-items-center">
+      <button @click="downloadPdf" :disabled="isGenerating" class="btn btn-primary btn-sm fw-medium">
         <span v-if="isGenerating" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-        <i v-else class="bi bi-file-earmark-arrow-down-fill me-2"></i>
-        {{ isGenerating ? 'Генерація файлу...' : 'Завантажити PDF' }}
+        {{ isGenerating ? 'Генерація...' : 'Завантажити PDF' }}
       </button>
     </div>
 
-    <div class="container py-5 px-4" style="max-width: 1000px;" ref="reportContainer">
+    <div class="container document-page bg-white p-4 p-md-5 mx-auto" ref="reportContainer" style="max-width: 900px;">
 
-      <!-- Report Header -->
-      <div class="text-center mb-5 avoid-break">
-        <div class="d-inline-flex align-items-center justify-content-center p-3 rounded-circle bg-primary bg-opacity-10 mb-3">
-          <i class="bi bi-layers-half text-primary fs-1"></i>
-        </div>
-        <h1 class="fw-black text-dark tracking-tight mb-2">Звіт перевірки коду на схожість</h1>
-        <p class="text-muted font-monospace small mb-4">ID Аналізу: {{ report.analysis_id }}</p>
+<div class="border-bottom pb-4 mb-4 avoid-break">
+        <div class="d-flex justify-content-between align-items-end mb-4">
+          <div>
+            <h1 class="h3 fw-bold mb-1 text-dark">Звіт про аналіз схожості коду</h1>
+            <div class="text-muted small font-monospace">ID Аналізу: {{ report.analysis_id }}</div>
+          </div>
+          </div>
 
-        <div class="row g-4 justify-content-center">
-          <div class="col-md-5">
-            <div class="p-4 border rounded-4 bg-light h-100 d-flex flex-column align-items-center justify-content-center">
-              <span class="text-muted text-uppercase fw-bold small tracking-wider mb-2">Файл 1</span>
-              <span class="fw-bold fs-5 text-dark text-break">{{ report.source_files.name_a }}</span>
+        <div class="row g-3 mb-4" v-if="similarityStats">
+          <div class="col-3">
+            <div class="border p-2 px-3 h-100 rounded-1 text-center bg-light">
+              <div class="small text-muted text-uppercase fw-bold mb-1" style="font-size: 0.65rem;">Максимум</div>
+              <div class="h4 fw-bold mb-0" :style="`color: ${getScoreColorHex(similarityStats.max)}`">{{ similarityStats.max }}%</div>
+              <div class="text-muted text-truncate" style="font-size: 0.65rem;">
+                {{ similarityStats.maxAlgos.length === 1 ? similarityStats.maxAlgos[0] : similarityStats.maxAlgos.length + ' алг.' }}
+              </div>
             </div>
           </div>
-          <div class="col-md-2 d-flex align-items-center justify-content-center">
-             <div class="text-center">
-                <span class="d-block fw-bold text-uppercase text-muted small mb-2">Схожість</span>
-                <h2 class="fw-black m-0" :style="`color: ${getScoreColorHex(globalScore)}`">{{ globalScore }}%</h2>
-             </div>
+          <div class="col-3">
+             <div class="border p-2 px-3 h-100 rounded-1 text-center bg-light">
+              <div class="small text-muted text-uppercase fw-bold mb-1" style="font-size: 0.65rem;">Середнє</div>
+              <div class="h4 fw-bold mb-0 text-dark">{{ similarityStats.avg }}%</div>
+            </div>
           </div>
-          <div class="col-md-5">
-            <div class="p-4 border rounded-4 bg-light h-100 d-flex flex-column align-items-center justify-content-center">
-              <span class="text-muted text-uppercase fw-bold small tracking-wider mb-2">Файл 2</span>
-              <span class="fw-bold fs-5 text-dark text-break">{{ report.source_files.name_b }}</span>
+          <div class="col-3">
+             <div class="border p-2 px-3 h-100 rounded-1 text-center bg-light">
+              <div class="small text-muted text-uppercase fw-bold mb-1" style="font-size: 0.65rem;">Медіана</div>
+              <div class="h4 fw-bold mb-0 text-dark">{{ similarityStats.median }}%</div>
+            </div>
+          </div>
+          <div class="col-3">
+            <div class="border p-2 px-3 h-100 rounded-1 text-center bg-light">
+              <div class="small text-muted text-uppercase fw-bold mb-1" style="font-size: 0.65rem;">Мінімум</div>
+              <div class="h4 fw-bold mb-0" :style="`color: ${getScoreColorHex(similarityStats.min)}`">{{ similarityStats.min }}%</div>
+              <div class="text-muted text-truncate" style="font-size: 0.65rem;">
+                {{ similarityStats.minAlgos.length === 1 ? similarityStats.minAlgos[0] : similarityStats.minAlgos.length + ' алг.' }}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="row g-3">
+          <div class="col-6">
+            <div class="border p-3 h-100 rounded-1">
+              <div class="small text-muted text-uppercase fw-bold mb-1">Файл 1</div>
+              <div class="fw-medium text-break font-monospace small">{{ report.source_files.name_a }}</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="border p-3 h-100 rounded-1">
+              <div class="small text-muted text-uppercase fw-bold mb-1">Файл 2</div>
+              <div class="fw-medium text-break font-monospace small">{{ report.source_files.name_b }}</div>
             </div>
           </div>
         </div>
       </div>
 
-      <hr class="mb-5">
-
-      <!-- Categories & Algorithms Details -->
-      <div v-for="cat in report.categories_results" :key="cat.category_name" class="mb-5">
-
-        <div class="d-flex align-items-center justify-content-between bg-light p-3 rounded-3 mb-4 border avoid-break">
-           <h3 class="m-0 fw-bold text-dark d-flex align-items-center">
-             <i class="bi bi-folder2-open text-primary me-3"></i> {{ formatCategoryName(cat.category_name) }}
-           </h3>
-           <span class="badge border px-3 py-2 fs-6 rounded-pill text-dark bg-white shadow-sm">Схожість: {{ formatScore(cat.category_similarity_score) }}</span>
+      <div v-for="(cat, cIdx) in report.categories_results" :key="cat.category_name" class="mb-4">
+        
+        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3 avoid-break mt-4">
+          <h2 class="h5 fw-bold m-0 text-dark">{{ cIdx + 1 }}. {{ formatCategoryName(cat.category_name) }}</h2>
+          <span class="badge border bg-light text-dark">Схожість: {{ formatScore(cat.category_similarity_score) }}</span>
         </div>
 
-        <div v-for="algo in cat.algorithms" :key="algo.method" class="mb-5 ms-0 ms-md-4 border-start border-4 border-primary border-opacity-25 ps-4 pb-4">
+        <div v-for="algo in cat.algorithms" :key="algo.method" class="mb-4 ps-3 border-start border-2 border-secondary border-opacity-25">
+          <div class="d-flex justify-content-between align-items-center mb-2 avoid-break">
+            <h3 class="h6 fw-bold m-0 text-secondary">{{ formatMethodName(algo.method) }}</h3>
+            <span class="small fw-medium">Збіг: {{ formatScore(algo.similarity_score) }}</span>
+          </div>
 
-           <div class="d-flex align-items-center justify-content-between mb-3 avoid-break">
-             <h4 class="fw-bold text-dark mb-0 d-flex align-items-center">
-               <i class="bi bi-cpu text-secondary me-2"></i> {{ formatMethodName(algo.method) }}
-             </h4>
-             <span class="badge px-3 py-2 bg-light border text-dark fs-6 rounded-pill">Збіг: {{ formatScore(algo.similarity_score) }}</span>
-           </div>
-
-           <!-- Text Highlight Unrolled -->
-           <div v-if="algo.evidence_type === 'text_highlight' && algo.evidence?.matched_blocks" class="mt-4">
-             <div v-for="(block, bIdx) in algo.evidence.matched_blocks" :key="bIdx" class="mb-4 border rounded-4 overflow-hidden shadow-sm">
-                <div class="bg-light px-4 py-2 border-bottom fw-bold text-muted small d-flex align-items-center">
-                  <i class="bi bi-file-diff text-primary me-2"></i> Збіг #{{ bIdx + 1 }}
-                  <span class="badge bg-white text-secondary border ms-auto">Рядки: {{ block.start_line_a }}-{{ block.end_line_a }} ⟷ {{ block.start_line_b }}-{{ block.end_line_b }}</span>
+          <div v-if="algo.evidence_type === 'text_highlight' && algo.evidence?.matched_blocks">
+            <div v-for="(block, bIdx) in algo.evidence.matched_blocks" :key="bIdx" class="border rounded-1 mb-3 avoid-break">
+              <div class="bg-light px-2 py-1 border-bottom small text-muted d-flex justify-content-between">
+                <span>Блок #{{ bIdx + 1 }}</span>
+                <span>Рядки: {{ block.start_line_a }}-{{ block.end_line_a }} &rarr; {{ block.start_line_b }}-{{ block.end_line_b }}</span>
+              </div>
+              <div class="row g-0">
+                <div class="col-6 border-end">
+                  <pre class="m-0 p-2 code-block bg-white text-dark"><code>{{ block.content_a }}</code></pre>
                 </div>
-                <div class="row g-0">
+                <div class="col-6">
+                  <pre class="m-0 p-2 code-block bg-white text-dark"><code>{{ block.content_b }}</code></pre>
+                </div>
+              </div>
+            </div>
+            <div v-if="algo.evidence.matched_blocks.length === 0" class="text-muted small">Збігів не знайдено.</div>
+          </div>
+
+          <div v-else-if="algo.evidence_type === 'token_sequence' && algo.evidence?.matched_hashes">
+            <table class="table table-sm table-bordered mb-0 avoid-break">
+              <thead class="table-light text-muted small">
+                <tr>
+                  <th>Послідовність токенів</th>
+                  <th class="text-center" style="width: 60px">Ф1</th>
+                  <th class="text-center" style="width: 60px">Ф2</th>
+                </tr>
+              </thead>
+              <tbody class="small">
+                <tr v-for="(hash, hIdx) in algo.evidence.matched_hashes" :key="hIdx">
+                  <td class="font-monospace text-break">{{ hash.token_sequence }} <br><span class="text-muted" style="font-size: 0.7rem;">{{ hash.hash_value }}</span></td>
+                  <td class="text-center align-middle">{{ hasOccurrence(hash, 'a') ? '✓' : '-' }}</td>
+                  <td class="text-center align-middle">{{ hasOccurrence(hash, 'b') ? '✓' : '-' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div v-else-if="algo.evidence_type === 'ast_tree_mapping'">
+            <div v-if="Array.isArray(algo.evidence)">
+              <div v-for="(m, idx) in algo.evidence" :key="idx" class="border rounded-1 mb-2 avoid-break">
+                <div class="bg-light px-2 py-1 border-bottom small d-flex justify-content-between">
+                  <span class="fw-medium">{{ formatMatchType(m.type) }}</span>
+                  <span class="text-muted">{{ formatSeverity(m.severity) }}</span>
+                </div>
+                <div class="row g-0" v-if="(m.leftLines && m.leftLines.length) || (m.rightLines && m.rightLines.length)">
                   <div class="col-6 border-end">
-                    <div class="bg-light px-3 py-1 border-bottom small fw-bold text-secondary text-truncate">{{ block.file_a || report.source_files.name_a }}</div>
-                    <pre class="m-0 p-3 bg-white text-danger code-block"><code>{{ block.content_a }}</code></pre>
+                    <pre class="m-0 p-2 code-block"><code>{{ getLinesContent(report.source_files?.file_a, m.leftLines, 'ast_tree_mapping') }}</code></pre>
                   </div>
                   <div class="col-6">
-                    <div class="bg-light px-3 py-1 border-bottom small fw-bold text-secondary text-truncate">{{ block.file_b || report.source_files.name_b }}</div>
-                    <pre class="m-0 p-3 bg-white text-danger code-block"><code>{{ block.content_b }}</code></pre>
+                    <pre class="m-0 p-2 code-block"><code>{{ getLinesContent(report.source_files?.file_b, m.rightLines, 'ast_tree_mapping') }}</code></pre>
                   </div>
                 </div>
-             </div>
-             <div v-if="algo.evidence.matched_blocks.length === 0" class="text-muted small italic">Збігів не знайдено.</div>
-           </div>
-
-           <!-- Token Sequence Unrolled -->
-           <div v-else-if="algo.evidence_type === 'token_sequence' && algo.evidence?.matched_hashes" class="mt-4">
-              <table class="table table-bordered bg-white shadow-sm rounded-4 overflow-hidden align-middle">
-                <thead class="bg-light text-muted small text-uppercase">
-                  <tr>
-                    <th>Хеш послідовності</th>
-                    <th class="text-center">Файл 1</th>
-                    <th class="text-center">Файл 2</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(hash, hIdx) in algo.evidence.matched_hashes" :key="hIdx">
-                    <td>
-                      <span class="badge bg-light text-secondary border me-2 font-monospace">{{ hash.hash_value }}</span>
-                      <span class="small">{{ hash.token_sequence }}</span>
-                    </td>
-                    <td class="text-center">
-                       <i class="bi bi-check-circle-fill text-success" v-if="hasOccurrence(hash, 'a')"></i><span v-else class="text-muted">-</span>
-                    </td>
-                    <td class="text-center">
-                       <i class="bi bi-check-circle-fill text-danger" v-if="hasOccurrence(hash, 'b')"></i><span v-else class="text-muted">-</span>
-                    </td>
-                  </tr>
-                  <tr v-if="algo.evidence.matched_hashes.length === 0"><td colspan="3" class="text-center text-muted">Збігів не знайдено</td></tr>
-                </tbody>
-              </table>
-           </div>
-
-           <!-- AST Tree Unrolled -->
-           <div v-else-if="algo.evidence_type === 'ast_tree_mapping'" class="mt-4">
-              <div v-if="Array.isArray(algo.evidence)">
-                  <div v-for="(m, idx) in algo.evidence" :key="idx" class="mb-4 border rounded-4 overflow-hidden shadow-sm">
-                     <div class="bg-light px-3 py-2 border-bottom d-flex justify-content-between align-items-center">
-                       <span class="small fw-bold text-dark"><i class="bi bi-link-45deg text-primary me-2"></i>{{ formatMatchType(m.type) }}</span>
-                       <span class="badge border bg-white text-secondary rounded-pill">Рівень: {{ formatSeverity(m.severity) }}</span>
-                     </div>
-                     <div class="row g-0" v-if="(m.leftLines && m.leftLines.length) || (m.rightLines && m.rightLines.length)">
-                        <div class="col-6 border-end">
-                           <div class="bg-light bg-opacity-50 px-3 py-1 border-bottom small text-muted text-truncate">{{ report.source_files.name_a }}</div>
-                           <pre class="m-0 p-3 code-block"><code>{{ getLinesContent(report.source_files?.file_a, m.leftLines, 'ast_tree_mapping') }}</code></pre>
-                        </div>
-                        <div class="col-6">
-                           <div class="bg-light bg-opacity-50 px-3 py-1 border-bottom small text-muted text-truncate">{{ report.source_files.name_b }}</div>
-                           <pre class="m-0 p-3 code-block text-danger"><code>{{ getLinesContent(report.source_files?.file_b, m.rightLines, 'ast_tree_mapping') }}</code></pre>
-                        </div>
-                     </div>
-                     <div v-else class="p-3 text-muted small text-center bg-white">Структурний збіг для всього файлу</div>
-                  </div>
+                <div v-else class="p-2 text-muted small text-center">Структурний збіг для всього файлу</div>
               </div>
-              <template v-else>
+            </div>
+            
+            <template v-else>
               <div v-if="algo.evidence?.full_nodes_a && algo.evidence?.full_nodes_b">
-                 <div class="html2pdf__page-break"></div> <!-- Примусовий розрив сторінки для AST-графів -->
-                 <div class="mb-4 border rounded-4 overflow-hidden shadow-sm p-3 bg-white">
-                    <h6 class="fw-bold text-dark mb-3"><i class="bi bi-diagram-3 text-primary me-2"></i> Повне AST-дерево</h6>
-                    <div class="row g-4">
-                      <div class="col-12 avoid-break">
-                         <div class="border rounded-3 h-100">
-                           <div class="bg-light px-3 py-2 border-bottom fw-bold text-center">Файл 1 (Вузли)</div>
-                           <div class="p-2 graph-print-container d-flex justify-content-center bg-white border-bottom">
-                             <InteractiveGraph :graph-data="buildASTVisData(algo.evidence.full_nodes_a, getMatchedASTNodeIds(algo.evidence, 'a'))" :options="printGraphOptions" height="500px" class="border-0 shadow-none" />
-                           </div>
-                           <ul class="list-group list-group-flush small m-0">
-                             <li class="list-group-item px-2 py-1 border-0" v-for="node in algo.evidence.full_nodes_a" :key="node.id">
-                               <span class="text-muted font-monospace me-2">[{{ node.id }}]</span>{{ node.label }}
-                             </li>
-                           </ul>
-                         </div>
-                      </div>
-                      <div class="col-12 avoid-break mt-4">
-                         <div class="border rounded-3 h-100">
-                           <div class="bg-light px-3 py-2 border-bottom fw-bold text-center">Файл 2 (Вузли)</div>
-                           <div class="p-2 graph-print-container d-flex justify-content-center bg-white border-bottom">
-                             <InteractiveGraph :graph-data="buildASTVisData(algo.evidence.full_nodes_b, getMatchedASTNodeIds(algo.evidence, 'b'))" :options="printGraphOptions" height="500px" class="border-0 shadow-none" />
-                           </div>
-                           <ul class="list-group list-group-flush small m-0">
-                             <li class="list-group-item px-2 py-1 border-0" v-for="node in algo.evidence.full_nodes_b" :key="node.id">
-                               <span class="text-muted font-monospace me-2">[{{ node.id }}]</span>{{ node.label }}
-                             </li>
-                           </ul>
-                         </div>
-                      </div>
-                    </div>
-                 </div>
+                <div class="html2pdf__page-break"></div>
+                <h4 class="h6 fw-bold mb-2">Повне AST-дерево</h4>
+                <div class="border rounded-1 mb-3 avoid-break">
+                  <div class="bg-light px-2 py-1 border-bottom small fw-bold">Файл 1</div>
+                  <div class="graph-print-container"><InteractiveGraph :graph-data="buildASTVisData(algo.evidence.full_nodes_a, getMatchedASTNodeIds(algo.evidence, 'a'))" :options="printGraphOptions" height="300px" /></div>
+                </div>
+                <div class="border rounded-1 mb-3 avoid-break">
+                  <div class="bg-light px-2 py-1 border-bottom small fw-bold">Файл 2</div>
+                  <div class="graph-print-container"><InteractiveGraph :graph-data="buildASTVisData(algo.evidence.full_nodes_b, getMatchedASTNodeIds(algo.evidence, 'b'))" :options="printGraphOptions" height="300px" /></div>
+                </div>
               </div>
+              
               <div v-if="algo.evidence?.matched_subtrees">
-                 <div class="html2pdf__page-break"></div> <!-- Примусовий розрив сторінки для AST-графів -->
-                 <div v-for="(subtree, sIdx) in algo.evidence.matched_subtrees" :key="sIdx" class="mb-4 border rounded-4 overflow-hidden shadow-sm p-3 bg-white">
-                    <h6 class="fw-bold text-dark mb-3"><i class="bi bi-diagram-3 text-primary me-2"></i> Збіг піддерева: <span class="text-primary">{{ subtree.node_type }}</span></h6>
-                    <div class="row g-4">
-                      <div class="col-12 avoid-break">
-                         <div class="border rounded-3 h-100">
-                           <div class="bg-light px-3 py-2 border-bottom fw-bold text-center">Файл 1 (Вузли)</div>
-                           <div class="p-2 graph-print-container d-flex justify-content-center bg-white border-bottom">
-                             <InteractiveGraph :graph-data="buildASTVisData(subtree.nodes_a, getMatchedASTNodeIds(algo.evidence, 'a'))" :options="printGraphOptions" height="500px" class="border-0 shadow-none" />
-                           </div>
-                           <ul class="list-group list-group-flush small m-0">
-                             <li class="list-group-item px-2 py-1 border-0" v-for="node in subtree.nodes_a" :key="node.id">
-                               <span class="text-muted font-monospace me-2">[{{ node.id }}]</span>{{ node.label }}
-                             </li>
-                           </ul>
-                         </div>
-                      </div>
-                      <div class="col-12 avoid-break mt-4">
-                         <div class="border rounded-3 h-100">
-                           <div class="bg-light px-3 py-2 border-bottom fw-bold text-center">Файл 2 (Вузли)</div>
-                           <div class="p-2 graph-print-container d-flex justify-content-center bg-white border-bottom">
-                             <InteractiveGraph :graph-data="buildASTVisData(subtree.nodes_b, getMatchedASTNodeIds(algo.evidence, 'b'))" :options="printGraphOptions" height="500px" class="border-0 shadow-none" />
-                           </div>
-                           <ul class="list-group list-group-flush small m-0">
-                             <li class="list-group-item px-2 py-1 border-0" v-for="node in subtree.nodes_b" :key="node.id">
-                               <span class="text-muted font-monospace me-2">[{{ node.id }}]</span>{{ node.label }}
-                             </li>
-                           </ul>
-                         </div>
-                      </div>
-                    </div>
-                 </div>
-              </div>
-              </template>
-           </div>
-
-           <!-- Graph Mapping Unrolled -->
-           <div v-else-if="algo.evidence_type === 'graph_mapping'" class="mt-4">
-              <div v-if="algo.evidence.matches && algo.evidence.matches.length > 0" class="mb-4">
-                <table class="table table-sm table-bordered bg-white small mb-0">
-                  <thead class="bg-light text-muted">
-                    <tr><th>Тип збігу</th><th>Рівень</th></tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="(match, idx) in algo.evidence.matches" :key="idx">
-                      <td>{{ formatMatchType(match.type) }}</td>
-                      <td><span class="badge bg-light text-dark border">{{ formatSeverity(match.severity) }}</span></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div class="html2pdf__page-break" v-if="algo.evidence.graph_a || algo.evidence.graph_b"></div> <!-- Примусовий розрив сторінки для CFG-графів -->
-              <div class="row g-4" v-if="algo.evidence.graph_a || algo.evidence.graph_b">
-                 <div class="col-12 avoid-break" v-if="algo.evidence.graph_a">
-                   <div class="border rounded-3 bg-white h-100">
-                     <div class="bg-light px-3 py-2 border-bottom fw-bold small text-center">CFG Файл 1</div>
-                     <div class="p-2 graph-print-container d-flex justify-content-center border-bottom">
-                       <InteractiveGraph :graph-data="buildCFGVisData(algo.evidence.graph_a)" :options="printGraphOptions" height="500px" class="border-0 shadow-none" />
-                     </div>
-                     <div class="p-3">
-                       <div v-for="node in algo.evidence.graph_a.nodes" :key="node.id" class="mb-2">
-                         <span class="badge bg-light text-secondary border me-2">{{ node.type }}</span>
-                         <code class="text-dark small">{{ node.content }}</code>
-                       </div>
-                     </div>
-                   </div>
-                 </div>
-                 <div class="col-12 avoid-break mt-4" v-if="algo.evidence.graph_b">
-                   <div class="border rounded-3 bg-white h-100">
-                     <div class="bg-light px-3 py-2 border-bottom fw-bold small text-center">CFG Файл 2</div>
-                     <div class="p-2 graph-print-container d-flex justify-content-center border-bottom">
-                       <InteractiveGraph :graph-data="buildCFGVisData(algo.evidence.graph_b)" :options="printGraphOptions" height="500px" class="border-0 shadow-none" />
-                     </div>
-                     <div class="p-3">
-                       <div v-for="node in algo.evidence.graph_b.nodes" :key="node.id" class="mb-2">
-                         <span class="badge bg-light text-secondary border me-2">{{ node.type }}</span>
-                         <code class="text-dark small">{{ node.content }}</code>
-                       </div>
-                     </div>
-                   </div>
-                 </div>
-              </div>
-           </div>
-
-           <!-- Metrics Unrolled -->
-           <div v-else-if="algo.evidence_type === 'metric_comparison'" class="mt-4 avoid-break">
-              <div class="row g-4">
-                <div class="col-6">
-                   <div class="border rounded-4 bg-white p-3 shadow-sm h-100">
-                     <h6 class="fw-bold text-primary mb-3 text-center border-bottom pb-2">Метрики: {{ report.source_files.name_a }}</h6>
-                     <table class="table table-sm table-borderless small m-0">
-                       <tbody>
-                         <tr v-for="(val, key) in algo.evidence.metrics_a" :key="key" class="border-bottom">
-                           <td class="text-muted py-2">{{ formatMetricKey(String(key)) }}</td>
-                           <td class="text-end fw-bold py-2">{{ typeof val === 'number' && !Number.isInteger(val) ? val.toFixed(2) : val }}</td>
-                         </tr>
-                       </tbody>
-                     </table>
-                   </div>
-                </div>
-                <div class="col-6">
-                   <div class="border rounded-4 bg-white p-3 shadow-sm h-100">
-                     <h6 class="fw-bold text-danger mb-3 text-center border-bottom pb-2">Метрики: {{ report.source_files.name_b }}</h6>
-                     <table class="table table-sm table-borderless small m-0">
-                       <tbody>
-                         <tr v-for="(val, key) in algo.evidence.metrics_b" :key="key" class="border-bottom">
-                           <td class="text-muted py-2">{{ formatMetricKey(String(key)) }}</td>
-                           <td class="text-end fw-bold py-2">{{ typeof val === 'number' && !Number.isInteger(val) ? val.toFixed(2) : val }}</td>
-                         </tr>
-                       </tbody>
-                     </table>
-                   </div>
+                <div class="html2pdf__page-break"></div>
+                <div v-for="(subtree, sIdx) in algo.evidence.matched_subtrees" :key="sIdx" class="mb-4">
+                  <h4 class="h6 fw-bold mb-2">Піддерево: {{ subtree.node_type }}</h4>
+                  <div class="border rounded-1 mb-2 avoid-break">
+                    <div class="bg-light px-2 py-1 border-bottom small fw-bold">Файл 1</div>
+                    <div class="graph-print-container"><InteractiveGraph :graph-data="buildASTVisData(subtree.nodes_a, getMatchedASTNodeIds(algo.evidence, 'a'))" :options="printGraphOptions" height="250px" /></div>
+                  </div>
+                  <div class="border rounded-1 avoid-break">
+                    <div class="bg-light px-2 py-1 border-bottom small fw-bold">Файл 2</div>
+                    <div class="graph-print-container"><InteractiveGraph :graph-data="buildASTVisData(subtree.nodes_b, getMatchedASTNodeIds(algo.evidence, 'b'))" :options="printGraphOptions" height="250px" /></div>
+                  </div>
                 </div>
               </div>
-              <div v-if="algo.evidence.conclusion" class="mt-4 alert bg-light border text-dark p-4 rounded-4 shadow-sm text-center">
-                 <i class="bi bi-robot text-primary fs-3 d-block mb-2"></i>
-                 <span class="fw-medium">{{ algo.evidence.conclusion }}</span>
+            </template>
+          </div>
+
+          <div v-else-if="algo.evidence_type === 'graph_mapping'">
+            <table class="table table-sm table-bordered mb-3 avoid-break" v-if="algo.evidence.matches && algo.evidence.matches.length > 0">
+              <thead class="table-light small">
+                <tr><th>Тип збігу</th><th>Рівень</th></tr>
+              </thead>
+              <tbody class="small">
+                <tr v-for="(match, idx) in algo.evidence.matches" :key="idx">
+                  <td>{{ formatMatchType(match.type) }}</td>
+                  <td>{{ formatSeverity(match.severity) }}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div v-if="algo.evidence.graph_a || algo.evidence.graph_b">
+              <div class="html2pdf__page-break"></div>
+              <div class="border rounded-1 mb-3 avoid-break" v-if="algo.evidence.graph_a">
+                <div class="bg-light px-2 py-1 border-bottom small fw-bold">CFG Файл 1</div>
+                <div class="graph-print-container border-bottom"><InteractiveGraph :graph-data="buildCFGVisData(algo.evidence.graph_a)" :options="printGraphOptions" height="300px" /></div>
               </div>
-           </div>
+              <div class="border rounded-1 avoid-break" v-if="algo.evidence.graph_b">
+                <div class="bg-light px-2 py-1 border-bottom small fw-bold">CFG Файл 2</div>
+                <div class="graph-print-container border-bottom"><InteractiveGraph :graph-data="buildCFGVisData(algo.evidence.graph_b)" :options="printGraphOptions" height="300px" /></div>
+              </div>
+            </div>
+          </div>
 
-           <!-- Raw fallback -->
-           <div v-else class="mt-4 bg-light p-3 rounded-3 border">
-              <pre class="m-0 small text-muted code-block"><code>{{ JSON.stringify(algo.evidence, null, 2) }}</code></pre>
-           </div>
+          <div v-else-if="algo.evidence_type === 'metric_comparison'" class="avoid-break">
+            <div class="row g-3">
+              <div class="col-6">
+                <div class="border rounded-1 p-2 h-100">
+                  <div class="small fw-bold border-bottom pb-1 mb-2">Метрики: Файл 1</div>
+                  <table class="table table-sm table-borderless small mb-0">
+                    <tbody>
+                      <tr v-for="(val, key) in algo.evidence.metrics_a" :key="key" class="border-bottom border-light">
+                        <td class="text-muted p-1">{{ formatMetricKey(String(key)) }}</td>
+                        <td class="text-end fw-medium p-1">{{ typeof val === 'number' && !Number.isInteger(val) ? val.toFixed(2) : val }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="border rounded-1 p-2 h-100">
+                  <div class="small fw-bold border-bottom pb-1 mb-2">Метрики: Файл 2</div>
+                  <table class="table table-sm table-borderless small mb-0">
+                    <tbody>
+                      <tr v-for="(val, key) in algo.evidence.metrics_b" :key="key" class="border-bottom border-light">
+                        <td class="text-muted p-1">{{ formatMetricKey(String(key)) }}</td>
+                        <td class="text-end fw-medium p-1">{{ typeof val === 'number' && !Number.isInteger(val) ? val.toFixed(2) : val }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div v-if="algo.evidence.conclusion" class="mt-3 p-3 bg-light border rounded-1 small fw-medium">
+              Висновок: {{ algo.evidence.conclusion }}
+            </div>
+          </div>
 
+          <div v-else class="bg-light p-2 border rounded-1">
+            <pre class="m-0 small text-muted code-block"><code>{{ JSON.stringify(algo.evidence, null, 2) }}</code></pre>
+          </div>
         </div>
       </div>
 
-      <!-- Footer -->
-      <div class="text-center mt-5 pt-4 border-top avoid-break text-muted small">
-        <p class="mb-1 fw-bold">Система перевірки коду AlgoTrace</p>
-        <p class="mb-0">Згенеровано: {{ new Date().toLocaleString() }}</p>
+      <div class="text-center mt-5 pt-3 border-top avoid-break text-muted small">
+        <span class="fw-bold">AlgoTrace Report</span> &bull; Згенеровано: {{ new Date().toLocaleString() }}
       </div>
 
     </div>
@@ -590,38 +568,48 @@ const downloadPdf = async () => {
 </template>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&family=Inter:wght@400;600;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@400;500;600;700&display=swap');
 
 .print-container {
   font-family: 'Inter', system-ui, sans-serif;
-  color: #212529;
-  background: #f8f9fa;
+  color: #1a1d20;
+}
+
+/* Document Page Wrapper for Screen */
+.document-page {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  border: 1px solid #e0e0e0;
 }
 
 .code-block {
   font-family: 'Fira Code', monospace;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
 .graph-print-container {
   height: auto;
-  min-height: 500px;
+  min-height: 250px;
+  background-color: #fcfcfc;
 }
 
-.tracking-wider { letter-spacing: 0.05em; }
-.tracking-tight { letter-spacing: -0.03em; }
-.fw-black { font-weight: 900; }
-
-/* Print Styles */
+/* Print Specific Styles */
 @media print {
   .no-print {
     display: none !important;
   }
 
   .print-container {
-    background: white !important;
+    background: transparent !important;
+  }
+
+  .document-page {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    max-width: 100% !important;
   }
 
   .avoid-break {
@@ -633,10 +621,6 @@ const downloadPdf = async () => {
     page-break-before: always;
   }
 
-  .shadow-sm, .shadow, .shadow-lg {
-    box-shadow: none !important;
-  }
-
   body {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
@@ -645,18 +629,6 @@ const downloadPdf = async () => {
 
   .bg-light {
     background-color: #f8f9fa !important;
-  }
-
-  .bg-primary {
-    background-color: #0d6efd !important;
-  }
-
-  .text-primary {
-    color: #0d6efd !important;
-  }
-
-  .text-danger {
-    color: #dc3545 !important;
   }
 
   .border, .border-start, .border-bottom, .border-top, .border-end {

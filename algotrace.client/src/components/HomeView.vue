@@ -347,8 +347,8 @@ const startComparison = async () => {
 
     } else if (inputMode.value === 'text') {
       language = selectedLanguage.value;
-      submissionAData = { files: [{ filename: "submission.txt", content: code1.value }] };
-      submissionBData = { files: [{ filename: "reference.txt", content: code2.value }] };
+      submissionAData = { files: [{ filename: "submission", content: code1.value }] };
+      submissionBData = { files: [{ filename: "reference", content: code2.value }] };
 
     } else if (inputMode.value === 'storage') {
       if (storageLeftMode.value === 'file') {
@@ -357,7 +357,7 @@ const startComparison = async () => {
         submissionAData = res1.data.submission;
       } else {
         language = selectedLanguage.value;
-        submissionAData = { files: [{ filename: "submission.txt", content: code1.value }] };
+        submissionAData = { files: [{ filename: "submission", content: code1.value }] };
       }
     }
 

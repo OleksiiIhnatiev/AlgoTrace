@@ -3,7 +3,6 @@ import { computed, onMounted, ref, shallowRef, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { analysisState } from '@/services/analysis.service';
 import type { editor } from 'monaco-editor';
-import InteractiveGraph from './InteractiveGraph.vue';
 import { VueMonacoEditor } from '@guolao/vue-monaco-editor';
 import type * as monaco from 'monaco-editor';
 import { use } from 'echarts/core';
@@ -157,7 +156,7 @@ const activeCategory = ref<string | null>(null);
 const activeAlgorithm = ref<Algorithm | null>(null);
 
 const showExportModal = ref(false);
-const exportSelections = ref<Record<string, boolean>>({});
+const exportSelections = ref<Set<string>>(new Set());
 const isGeneratingPdf = ref(false);
 const exportSelectedMethods = ref<string[]>([]);
 
@@ -226,17 +225,17 @@ onMounted(() => {
 
 const openExportModal = () => {
   if (!report.value) return;
-  exportSelections.value = {};
+  exportSelections.value.clear(); // Clear the set before populating
   report.value.categories_results.forEach(cat => {
     cat.algorithms.forEach(algo => {
-      exportSelections.value[algo.method] = true;
+      exportSelections.value.add(algo.method); // Add all methods by default
     });
   });
   showExportModal.value = true;
 };
 
 const confirmExport = () => {
-  const selected = Object.keys(exportSelections.value).filter(k => exportSelections.value[k]);
+  const selected = Array.from(exportSelections.value); // Convert Set to Array for the prop
   if (selected.length === 0) {
     alert('Оберіть хоча б один алгоритм для експорту');
     return;
@@ -1371,7 +1370,15 @@ const getTokensLines = (occ: SequenceOccurrence | undefined) => {
               <h6 class="fw-bold text-dark mb-2 border-bottom pb-2"><i class="bi bi-diagram-3 text-primary me-2"></i>{{ formatCategoryName(cat.category_name) }}</h6>
               <div class="ms-3 mt-2 d-flex flex-column gap-2">
                 <div class="form-check" v-for="algo in cat.algorithms" :key="algo.method">
-                  <input class="form-check-input cursor-pointer shadow-sm" type="checkbox" :id="'export-' + algo.method" v-model="exportSelections[algo.method]">
+                  <input
+                    class="form-check-input cursor-pointer shadow-sm"
+                    type="checkbox"
+                    :id="'export-' + algo.method"
+                    :checked="exportSelections.has(algo.method)"
+                    @change="e => {
+                      if ((e.target as HTMLInputElement).checked) exportSelections.add(algo.method);
+                      else exportSelections.delete(algo.method);
+                    }">
                   <label class="form-check-label cursor-pointer small fw-medium text-secondary" :for="'export-' + algo.method">
                     {{ formatMethodName(algo.method) }}
                   </label>
@@ -1390,7 +1397,7 @@ const getTokensLines = (occ: SequenceOccurrence | undefined) => {
       </div>
     </div>
 
-    <div v-if="isGeneratingPdf" style="position: absolute; top: 0; left: 0; width: 1000px; opacity: 0; pointer-events: none; z-index: -1000; overflow: hidden;">
+    <div v-if="isGeneratingPdf" style="position: absolute; top: 0; left: -9999px; width: 1000px; pointer-events: none; z-index: -1000;">
       <ReportExportView :hidden-render="true" :result-index="isMultiReport ? selectedResultIndex : 0" :methods="exportSelectedMethods" @pdf-generated="onPdfGenerated" />
     </div>
   </div>
