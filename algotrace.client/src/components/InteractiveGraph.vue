@@ -12,14 +12,14 @@ import VChart from 'vue-echarts';
 // Глобальний патч для уникнення willReadFrequently
 if (typeof window !== 'undefined' && HTMLCanvasElement) {
   const origGetContext = HTMLCanvasElement.prototype.getContext;
-  if (!(origGetContext as any).__patched) {
-    HTMLCanvasElement.prototype.getContext = function(type: string, attributes?: any) {
+  if (!(origGetContext as unknown as { __patched?: boolean }).__patched) {
+    HTMLCanvasElement.prototype.getContext = function(this: HTMLCanvasElement, type: string, attributes?: CanvasRenderingContext2DSettings | undefined) {
       if (type === '2d') {
         attributes = { ...(attributes || {}), willReadFrequently: true };
       }
-      return origGetContext.call(this, type, attributes);
-    };
-    (HTMLCanvasElement.prototype.getContext as any).__patched = true;
+      return origGetContext.call(this, type, attributes as CanvasRenderingContext2DSettings);
+    } as typeof HTMLCanvasElement.prototype.getContext;
+    (HTMLCanvasElement.prototype.getContext as unknown as { __patched?: boolean }).__patched = true;
   }
 }
 
@@ -27,14 +27,30 @@ cytoscape.use(dagre);
 
 use([GraphChart, TreeChart, TooltipComponent, CanvasRenderer]);
 
+interface GraphNode {
+  id: string | number;
+  label?: string;
+  color?: { background?: string; border?: string; highlight?: { background?: string; border?: string } | string };
+  font?: { color?: string };
+  borderWidth?: number;
+}
+
+interface GraphEdge {
+  from: string | number;
+  to: string | number;
+  label?: string;
+  color?: { color?: string; highlight?: string };
+  width?: number;
+}
+
 interface GraphData {
-  nodes: any[];
-  edges: any[];
+  nodes: GraphNode[];
+  edges: GraphEdge[];
 }
 
 const props = defineProps<{
   graphData: GraphData;
-  options?: any;
+  options?: Record<string, unknown>;
   height?: string;
   isGraph?: boolean;
 }>();
@@ -51,9 +67,9 @@ const isCFG = computed(() => {
   return edges.some(e => e.label) || Array.from(inDegree.values()).some(d => d > 1);
 });
 
-const getBgColor = (n: any) => n.color?.background || (isDarkMode.value ? '#2a2a2a' : '#ffffff');
-const getBorderColor = (n: any) => n.color?.border || (isDarkMode.value ? '#495057' : '#ced4da');
-const getTextColor = (n: any) => n.font?.color || (isDarkMode.value ? '#e0e0e0' : '#212529');
+const getBgColor = (n: GraphNode) => n.color?.background || (isDarkMode.value ? '#2a2a2a' : '#ffffff');
+const getBorderColor = (n: GraphNode) => n.color?.border || (isDarkMode.value ? '#495057' : '#ced4da');
+const getTextColor = (n: GraphNode) => n.font?.color || (isDarkMode.value ? '#e0e0e0' : '#212529');
 
 const cyContainer = ref<HTMLElement | null>(null);
 let cyInstance: cytoscape.Core | null = null;
@@ -103,13 +119,13 @@ const initCytoscape = () => {
           'font-family': 'monospace',
           'font-size': '11px',
           'padding': '10px',
-          'width': (n: any) => {
+          'width': (n: cytoscape.NodeSingular) => {
             const label = n.data('label') || '';
             const lines = label.split('\n');
             const max = Math.max(...lines.map((l: string) => l.length));
             return Math.max(40, max * 7 + 20);
           },
-          'height': (n: any) => {
+          'height': (n: cytoscape.NodeSingular) => {
             const label = n.data('label') || '';
             const lines = label.split('\n');
             return Math.max(30, lines.length * 14 + 16);
@@ -141,7 +157,7 @@ const initCytoscape = () => {
       edgeSep: 40,
       rankSep: 80,
       animate: false
-    } as any
+    } as unknown as cytoscape.LayoutOptions
   });
 };
 
@@ -199,7 +215,7 @@ const treeChartOption = computed(() => {
       }
     });
 
-    const roots: any[] = [];
+    const roots: Record<string, unknown>[] = [];
     inDegree.forEach((degree, id) => {
       if (degree === 0) roots.push(nodeMap.get(id));
     });

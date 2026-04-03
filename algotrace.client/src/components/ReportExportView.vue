@@ -10,14 +10,14 @@ import { isDarkMode } from '../composables/useTheme';
 // Глобальний патч для уникнення willReadFrequently
 if (typeof window !== 'undefined' && HTMLCanvasElement) {
   const origGetContext = HTMLCanvasElement.prototype.getContext;
-  if (!(origGetContext as any).__patched) {
-    HTMLCanvasElement.prototype.getContext = function(type: string, attributes?: any) {
+  if (!(origGetContext as unknown as { __patched?: boolean }).__patched) {
+    HTMLCanvasElement.prototype.getContext = function(this: HTMLCanvasElement, type: string, attributes?: CanvasRenderingContext2DSettings | undefined) {
       if (type === '2d') {
         attributes = { ...(attributes || {}), willReadFrequently: true };
       }
-      return origGetContext.call(this, type, attributes);
-    };
-    (HTMLCanvasElement.prototype.getContext as any).__patched = true;
+      return origGetContext.call(this, type, attributes as CanvasRenderingContext2DSettings);
+    } as typeof HTMLCanvasElement.prototype.getContext;
+    (HTMLCanvasElement.prototype.getContext as unknown as { __patched?: boolean }).__patched = true;
   }
 }
 
@@ -48,8 +48,8 @@ interface RawReport {
 interface VisNode {
   id: string | number;
   label?: string;
-  color?: any;
-  font?: any;
+  color?: { background?: string; border?: string; highlight?: { background?: string; border?: string } | string };
+  font?: { color?: string };
   borderWidth?: number;
 }
 
@@ -57,7 +57,7 @@ interface VisEdge {
   from: string | number;
   to: string | number;
   label?: string;
-  color?: any;
+  color?: { color?: string; highlight?: string };
   width?: number;
 }
 
@@ -333,18 +333,18 @@ const downloadPdf = async () => {
         useCORS: true, 
         logging: false, 
         backgroundColor: isDarkMode.value ? '#212529' : '#ffffff',
-        onclone: (clonedDoc: any) => {
+        onclone: (clonedDoc: Document) => {
           const win = clonedDoc.defaultView;
           if (win && win.HTMLCanvasElement) {
             const origGetContext = win.HTMLCanvasElement.prototype.getContext;
-            if (!(origGetContext as any).__patched) {
-              win.HTMLCanvasElement.prototype.getContext = function(type: string, attributes?: any) {
+            if (!(origGetContext as unknown as { __patched?: boolean }).__patched) {
+              win.HTMLCanvasElement.prototype.getContext = function(this: HTMLCanvasElement, type: string, attributes?: CanvasRenderingContext2DSettings | undefined) {
                 if (type === '2d') {
                   attributes = { ...(attributes || {}), willReadFrequently: true };
                 }
-                return origGetContext.call(this, type, attributes);
-              };
-              (win.HTMLCanvasElement.prototype.getContext as any).__patched = true;
+                return origGetContext.call(this, type, attributes as CanvasRenderingContext2DSettings);
+              } as typeof HTMLCanvasElement.prototype.getContext;
+              (win.HTMLCanvasElement.prototype.getContext as unknown as { __patched?: boolean }).__patched = true;
             }
           }
         }

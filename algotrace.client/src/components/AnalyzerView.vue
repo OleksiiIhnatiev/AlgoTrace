@@ -90,8 +90,8 @@ interface CFGGraph {
 interface VisNode {
   id: string | number;
   label?: string;
-  color?: any;
-  font?: any;
+  color?: { background?: string; border?: string; highlight?: { background?: string; border?: string } | string };
+  font?: { color?: string };
   borderWidth?: number;
 }
 
@@ -99,7 +99,7 @@ interface VisEdge {
   from: string | number;
   to: string | number;
   label?: string;
-  color?: any;
+  color?: { color?: string; highlight?: string };
   width?: number;
 }
 
@@ -178,10 +178,10 @@ const exportSelectedMethods = ref<string[]>([]);
 
 const showFullscreenGraph = ref(false);
 const fullscreenGraphTitle = ref('');
-const fullscreenGraphData = ref<any>(null);
+const fullscreenGraphData = ref<{ nodes: VisNode[], edges: VisEdge[] } | null>(null);
 const fullscreenGraphIsGraph = ref(false);
 
-const openFullscreenGraph = (title: string, data: any, isGraph: boolean) => {
+const openFullscreenGraph = (title: string, data: { nodes: VisNode[], edges: VisEdge[] }, isGraph: boolean) => {
   fullscreenGraphTitle.value = title;
   fullscreenGraphData.value = data;
   fullscreenGraphIsGraph.value = isGraph;
