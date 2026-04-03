@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, shallowRef, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
+import InteractiveGraph from './InteractiveGraph.vue';
 import { analysisState } from '@/services/analysis.service';
 import type { editor } from 'monaco-editor';
 import { VueMonacoEditor } from '@guolao/vue-monaco-editor';
@@ -10,7 +11,6 @@ import { RadarChart } from 'echarts/charts';
 import { TitleComponent, TooltipComponent, LegendComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import VChart from 'vue-echarts';
-import type { Node as VisNode, Edge as VisEdge } from 'vis-network';
 import { isDarkMode, toggleTheme } from '../composables/useTheme';
 import ReportExportView from './ReportExportView.vue';
 
@@ -87,6 +87,22 @@ interface CFGGraph {
   edges: CFGEdge[];
 }
 
+interface VisNode {
+  id: string | number;
+  label?: string;
+  color?: { background?: string; border?: string; highlight?: { background?: string; border?: string } | string };
+  font?: { color?: string };
+  borderWidth?: number;
+}
+
+interface VisEdge {
+  from: string | number;
+  to: string | number;
+  label?: string;
+  color?: { color?: string; highlight?: string };
+  width?: number;
+}
+
 interface Evidence {
   matched_blocks?: MatchedBlock[];
   matched_sequences?: MatchedSequence[];
@@ -159,6 +175,18 @@ const showExportModal = ref(false);
 const exportSelections = ref<Set<string>>(new Set());
 const isGeneratingPdf = ref(false);
 const exportSelectedMethods = ref<string[]>([]);
+
+const showFullscreenGraph = ref(false);
+const fullscreenGraphTitle = ref('');
+const fullscreenGraphData = ref<{ nodes: VisNode[], edges: VisEdge[] } | null>(null);
+const fullscreenGraphIsGraph = ref(false);
+
+const openFullscreenGraph = (title: string, data: { nodes: VisNode[], edges: VisEdge[] }, isGraph: boolean) => {
+  fullscreenGraphTitle.value = title;
+  fullscreenGraphData.value = data;
+  fullscreenGraphIsGraph.value = isGraph;
+  showFullscreenGraph.value = true;
+};
 
 const isMultiReport = computed(() => {
   const raw = analysisState.currentReport as unknown as RawReport | null;
@@ -729,6 +757,7 @@ const getTokensLines = (occ: SequenceOccurrence | undefined) => {
 
 <template>
   <div class="min-vh-100 dashboard-bg pb-5" v-if="report">
+    <div class="no-print">
     <nav class="navbar navbar-light bg-white bg-opacity-75 border-bottom py-3 backdrop-blur sticky-top z-3 shadow-sm">
       <div class="container-fluid px-4">
         <div class="d-flex align-items-center">
@@ -1151,7 +1180,12 @@ const getTokensLines = (occ: SequenceOccurrence | undefined) => {
                               <div class="row g-4">
                                 <div class="col-md-6">
                                   <div class="card h-100 border-0 bg-transparent shadow-none">
-                                    <div class="card-header bg-light text-dark fw-bold py-3 border rounded-top-3"><i class="bi bi-diagram-2 me-2"></i> AST (Файл 1)</div>
+                                    <div class="card-header bg-light text-dark fw-bold p-2 px-3 border rounded-top-3 d-flex justify-content-between align-items-center">
+                                      <div><i class="bi bi-diagram-2 me-2"></i> AST (Файл 1)</div>
+                                      <button class="btn btn-sm btn-white border shadow-sm rounded-circle d-flex align-items-center justify-content-center hover-lift bg-white" style="width: 32px; height: 32px;" @click="openFullscreenGraph('Повне AST-дерево (Файл 1)', buildASTVisData(activeAlgorithm.evidence.full_nodes_a, getMatchedASTNodeIds(activeAlgorithm.evidence, 'a')), false)" title="На весь екран">
+                                        <i class="bi bi-arrows-fullscreen text-secondary" style="font-size: 0.8rem;"></i>
+                                      </button>
+                                    </div>
                                     <div class="p-3 border-bottom border-start border-end bg-white d-flex justify-content-center">
                                       <InteractiveGraph :graph-data="buildASTVisData(activeAlgorithm.evidence.full_nodes_a, getMatchedASTNodeIds(activeAlgorithm.evidence, 'a'))" />
                                     </div>
@@ -1168,7 +1202,12 @@ const getTokensLines = (occ: SequenceOccurrence | undefined) => {
                                 </div>
                                 <div class="col-md-6">
                                   <div class="card h-100 border-0 bg-transparent shadow-none">
-                                    <div class="card-header bg-light text-dark fw-bold py-3 border rounded-top-3"><i class="bi bi-diagram-2-fill me-2 text-danger"></i> AST (Файл 2)</div>
+                                    <div class="card-header bg-light text-dark fw-bold p-2 px-3 border rounded-top-3 d-flex justify-content-between align-items-center">
+                                      <div><i class="bi bi-diagram-2-fill me-2 text-danger"></i> AST (Файл 2)</div>
+                                      <button class="btn btn-sm btn-white border shadow-sm rounded-circle d-flex align-items-center justify-content-center hover-lift bg-white" style="width: 32px; height: 32px;" @click="openFullscreenGraph('Повне AST-дерево (Файл 2)', buildASTVisData(activeAlgorithm.evidence.full_nodes_b, getMatchedASTNodeIds(activeAlgorithm.evidence, 'b')), false)" title="На весь екран">
+                                        <i class="bi bi-arrows-fullscreen text-secondary" style="font-size: 0.8rem;"></i>
+                                      </button>
+                                    </div>
                                     <div class="p-3 border-bottom border-start border-end bg-white d-flex justify-content-center">
                                       <InteractiveGraph :graph-data="buildASTVisData(activeAlgorithm.evidence.full_nodes_b, getMatchedASTNodeIds(activeAlgorithm.evidence, 'b'))" />
                                     </div>
@@ -1196,7 +1235,12 @@ const getTokensLines = (occ: SequenceOccurrence | undefined) => {
                               <div class="row g-4">
                                 <div class="col-md-6">
                                   <div class="card h-100 border-0 bg-transparent shadow-none">
-                                    <div class="card-header bg-light text-dark fw-bold py-3 border rounded-top-3"><i class="bi bi-diagram-2 me-2"></i> AST Вузли (Файл 1)</div>
+                                    <div class="card-header bg-light text-dark fw-bold p-2 px-3 border rounded-top-3 d-flex justify-content-between align-items-center">
+                                      <div><i class="bi bi-diagram-2 me-2"></i> AST Вузли (Файл 1)</div>
+                                      <button class="btn btn-sm btn-white border shadow-sm rounded-circle d-flex align-items-center justify-content-center hover-lift bg-white" style="width: 32px; height: 32px;" @click="openFullscreenGraph('Піддерево: ' + subtree.node_type + ' (Файл 1)', buildASTVisData(subtree.nodes_a, getMatchedASTNodeIds(activeAlgorithm.evidence, 'a')), false)" title="На весь екран">
+                                        <i class="bi bi-arrows-fullscreen text-secondary" style="font-size: 0.8rem;"></i>
+                                      </button>
+                                    </div>
                                     <div class="p-3 border-bottom border-start border-end bg-white d-flex justify-content-center">
                                       <InteractiveGraph :graph-data="buildASTVisData(subtree.nodes_a, getMatchedASTNodeIds(activeAlgorithm.evidence, 'a'))" />
                                     </div>
@@ -1213,7 +1257,12 @@ const getTokensLines = (occ: SequenceOccurrence | undefined) => {
                                 </div>
                                 <div class="col-md-6">
                                   <div class="card h-100 border-0 bg-transparent shadow-none">
-                                    <div class="card-header bg-light text-dark fw-bold py-3 border rounded-top-3"><i class="bi bi-diagram-2-fill me-2 text-danger"></i> AST Вузли (Файл 2)</div>
+                                    <div class="card-header bg-light text-dark fw-bold p-2 px-3 border rounded-top-3 d-flex justify-content-between align-items-center">
+                                      <div><i class="bi bi-diagram-2-fill me-2 text-danger"></i> AST Вузли (Файл 2)</div>
+                                      <button class="btn btn-sm btn-white border shadow-sm rounded-circle d-flex align-items-center justify-content-center hover-lift bg-white" style="width: 32px; height: 32px;" @click="openFullscreenGraph('Піддерево: ' + subtree.node_type + ' (Файл 2)', buildASTVisData(subtree.nodes_b, getMatchedASTNodeIds(activeAlgorithm.evidence, 'b')), false)" title="На весь екран">
+                                        <i class="bi bi-arrows-fullscreen text-secondary" style="font-size: 0.8rem;"></i>
+                                      </button>
+                                    </div>
                                     <div class="p-3 border-bottom border-start border-end bg-white d-flex justify-content-center">
                                       <InteractiveGraph :graph-data="buildASTVisData(subtree.nodes_b, getMatchedASTNodeIds(activeAlgorithm.evidence, 'b'))" />
                                     </div>
@@ -1264,11 +1313,14 @@ const getTokensLines = (occ: SequenceOccurrence | undefined) => {
                       <div class="row g-4">
                         <div class="col-md-6">
                            <div class="card h-100 shadow-sm border rounded-4 overflow-hidden">
-                             <div class="card-header bg-light border-bottom p-3 d-flex align-items-center text-dark fw-bold">
-                               <i class="bi bi-box me-2 text-primary"></i> Вузли графа 1
+                             <div class="card-header bg-light border-bottom p-2 px-3 d-flex justify-content-between align-items-center text-dark fw-bold">
+                               <div><i class="bi bi-box me-2 text-primary"></i> Граф потоку/залежностей 1</div>
+                               <button class="btn btn-sm btn-white border shadow-sm rounded-circle d-flex align-items-center justify-content-center hover-lift bg-white" style="width: 32px; height: 32px;" @click="openFullscreenGraph('Граф потоку/залежностей 1', buildCFGVisData(activeAlgorithm.evidence.graph_a, activeAlgorithm.evidence.matches, 'a'), true)" title="На весь екран">
+                                 <i class="bi bi-arrows-fullscreen text-secondary" style="font-size: 0.8rem;"></i>
+                               </button>
                              </div>
                              <div class="p-3 border-bottom bg-white d-flex justify-content-center">
-                                <InteractiveGraph :graph-data="buildCFGVisData(activeAlgorithm.evidence.graph_a, activeAlgorithm.evidence.matches, 'a')" />
+                                   <InteractiveGraph :graph-data="buildCFGVisData(activeAlgorithm.evidence.graph_a, activeAlgorithm.evidence.matches, 'a')" :is-graph="true" />
                              </div>
                              <div class="card-body p-0 custom-scrollbar bg-white" style="max-height: 350px; overflow-y: auto;">
                                <ul class="list-group list-group-flush">
@@ -1284,11 +1336,14 @@ const getTokensLines = (occ: SequenceOccurrence | undefined) => {
                         </div>
                         <div class="col-md-6">
                            <div class="card h-100 shadow-sm border rounded-4 overflow-hidden">
-                             <div class="card-header bg-light border-bottom p-3 d-flex align-items-center text-dark fw-bold">
-                               <i class="bi bi-box me-2 text-danger"></i> Вузли графа 2
+                             <div class="card-header bg-light border-bottom p-2 px-3 d-flex justify-content-between align-items-center text-dark fw-bold">
+                               <div><i class="bi bi-box me-2 text-danger"></i> Граф потоку/залежностей 2</div>
+                               <button class="btn btn-sm btn-white border shadow-sm rounded-circle d-flex align-items-center justify-content-center hover-lift bg-white" style="width: 32px; height: 32px;" @click="openFullscreenGraph('Граф потоку/залежностей 2', buildCFGVisData(activeAlgorithm.evidence.graph_b, activeAlgorithm.evidence.matches, 'b'), true)" title="На весь екран">
+                                 <i class="bi bi-arrows-fullscreen text-secondary" style="font-size: 0.8rem;"></i>
+                               </button>
                              </div>
                              <div class="p-3 border-bottom bg-white d-flex justify-content-center">
-                                <InteractiveGraph :graph-data="buildCFGVisData(activeAlgorithm.evidence.graph_b, activeAlgorithm.evidence.matches, 'b')" />
+                                   <InteractiveGraph :graph-data="buildCFGVisData(activeAlgorithm.evidence.graph_b, activeAlgorithm.evidence.matches, 'b')" :is-graph="true" />
                              </div>
                              <div class="card-body p-0 custom-scrollbar bg-white" style="max-height: 350px; overflow-y: auto;">
                                <ul class="list-group list-group-flush">
@@ -1397,7 +1452,27 @@ const getTokensLines = (occ: SequenceOccurrence | undefined) => {
       </div>
     </div>
 
-    <div v-if="isGeneratingPdf" style="position: absolute; top: 0; left: -9999px; width: 1000px; pointer-events: none; z-index: -1000;">
+    <!-- Fullscreen Graph Modal -->
+    <div v-if="showFullscreenGraph" class="modal d-block animate__animated animate__fadeIn animate__faster" tabindex="-1" style="background: rgba(0,0,0,0.6); z-index: 1060; backdrop-filter: blur(5px);">
+      <div class="modal-dialog modal-fullscreen p-3 p-md-4">
+        <div class="modal-content rounded-4 shadow-lg border-0 d-flex flex-column h-100 overflow-hidden">
+          <div class="modal-header border-bottom px-4 py-3 bg-light rounded-top-4 d-flex align-items-center justify-content-between">
+            <h5 class="modal-title fw-bold text-dark m-0 d-flex align-items-center">
+              <i class="bi me-3 fs-4" :class="fullscreenGraphIsGraph ? 'bi-share text-primary' : 'bi-diagram-3 text-success'"></i>
+              {{ fullscreenGraphTitle }}
+            </h5>
+            <button type="button" class="btn-close" @click="showFullscreenGraph = false"></button>
+          </div>
+          <div class="modal-body p-0 bg-white flex-grow-1 position-relative d-flex">
+             <InteractiveGraph v-if="fullscreenGraphData" :graph-data="fullscreenGraphData" :is-graph="fullscreenGraphIsGraph" height="100%" class="w-100 border-0 rounded-0" />
+          </div>
+        </div>
+      </div>
+    </div>
+    </div>
+
+    <!-- Hidden Render Container for PDF Library -->
+    <div v-if="isGeneratingPdf" style="position: absolute; top: -9999px; left: -9999px; width: 1000px; z-index: -1000; background: white;">
       <ReportExportView :hidden-render="true" :result-index="isMultiReport ? selectedResultIndex : 0" :methods="exportSelectedMethods" @pdf-generated="onPdfGenerated" />
     </div>
   </div>

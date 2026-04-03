@@ -3,8 +3,23 @@ import { useRoute, useRouter } from 'vue-router';
 import { analysisState } from '@/services/analysis.service';
 import { computed, onMounted, ref, nextTick } from 'vue';
 import InteractiveGraph from './InteractiveGraph.vue';
-import type { Node as VisNode, Edge as VisEdge, Options as VisOptions } from 'vis-network';
-import html2pdf from 'html2pdf.js';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+import { isDarkMode } from '../composables/useTheme';
+
+// Глобальний патч для уникнення willReadFrequently
+if (typeof window !== 'undefined' && HTMLCanvasElement) {
+  const origGetContext = HTMLCanvasElement.prototype.getContext;
+  if (!(origGetContext as unknown as { __patched?: boolean }).__patched) {
+    HTMLCanvasElement.prototype.getContext = function(this: HTMLCanvasElement, type: string, attributes?: CanvasRenderingContext2DSettings | undefined) {
+      if (type === '2d') {
+        attributes = { ...(attributes || {}), willReadFrequently: true };
+      }
+      return origGetContext.call(this, type, attributes as CanvasRenderingContext2DSettings);
+    } as typeof HTMLCanvasElement.prototype.getContext;
+    (HTMLCanvasElement.prototype.getContext as unknown as { __patched?: boolean }).__patched = true;
+  }
+}
 
 interface MatchedBlock { start_line_a: number; end_line_a: number; start_line_b: number; end_line_b: number; content_a: string; content_b: string; file_a?: string; file_b?: string; }
 interface MatchedHash { hash_value: string; token_sequence: string; occurrences: { submission: 'a' | 'b' }[]; }
@@ -28,6 +43,22 @@ interface RawReport {
   source_files?: SourceFiles;
   main_submission?: { filename: string; content: string };
   results?: Array<{ global_similarity_score: number; categories_results: Category[]; target_file?: { filename: string; content: string } }>;
+}
+
+interface VisNode {
+  id: string | number;
+  label?: string;
+  color?: { background?: string; border?: string; highlight?: { background?: string; border?: string } | string };
+  font?: { color?: string };
+  borderWidth?: number;
+}
+
+interface VisEdge {
+  from: string | number;
+  to: string | number;
+  label?: string;
+  color?: { color?: string; highlight?: string };
+  width?: number;
 }
 
 const props = defineProps<{
@@ -159,10 +190,11 @@ const similarityStats = computed(() => {
   };
 });
 
+// Синхронізовано з палітрою AnalyzerView
 const getScoreColorHex = (score: number) => {
-  if (score < 30) return '#198754'; // Bootstrap success
-  if (score < 70) return '#fd7e14'; // Bootstrap orange
-  return '#dc3545'; // Bootstrap danger
+  if (score < 30) return '#10b981';
+  if (score < 70) return '#f59e0b';
+  return '#ef4444';
 };
 
 const formatScore = (score: number) => Math.round((score || 0) * 100) + '%';
@@ -237,19 +269,19 @@ const buildASTVisData = (nodes: ASTNode[], matchedNodeIds?: Set<string>): { node
     const isMatched = matchedNodeIds && matchedNodeIds.has(n.id);
     if (isMatched) {
       nodeObj.color = {
-          background: '#e8f5e9',
-          border: '#4caf50',
-          highlight: { background: '#c8e6c9', border: '#4caf50' }
+          background: '#ecfdf5',
+          border: '#10b981',
+          highlight: { background: '#d1fae5', border: '#059669' }
       };
-      nodeObj.font = { color: '#1b5e20' };
-      nodeObj.borderWidth = 1;
+      nodeObj.font = { color: '#047857' };
+      nodeObj.borderWidth = 2;
     }
     visNodes.push(nodeObj);
     if (n.children && Array.isArray(n.children)) {
       n.children.forEach((cId: string) => {
         const edgeObj: VisEdge = { from: n.id, to: cId };
         if (isMatched && matchedNodeIds.has(cId)) {
-            edgeObj.color = { color: '#4caf50' };
+            edgeObj.color = { color: '#10b981' };
             edgeObj.width = 2;
         }
         visEdges.push(edgeObj);
@@ -264,9 +296,9 @@ const buildCFGVisData = (graph: CFGGraph | undefined): { nodes: VisNode[], edges
   const visEdges: VisEdge[] = [];
   if (!graph || !graph.nodes) return { nodes: visNodes, edges: visEdges };
   graph.nodes.forEach((n: CFGNode) => {
-    let content = (n.content || '').replace(/["\]/g, "'").replace(/[\[\]{}()<>]/g, ' ');
+    let content = (n.content || '').replace(/["\\]/g, "'").replace(/[\[\]{}()<>]/g, ' ');
     if (content.length > 40) content = content.substring(0, 40) + '...';
-    visNodes.push({ id: n.id, label: `[L${n.line}]\n`, group: n.type });
+    visNodes.push({ id: n.id, label: `[L${n.line}]\n${content}` });
   });
   if (graph.edges && Array.isArray(graph.edges)) {
     graph.edges.forEach((e: CFGEdge) => visEdges.push({ from: e.source, to: e.target, label: e.type || '' }));
@@ -274,47 +306,81 @@ const buildCFGVisData = (graph: CFGGraph | undefined): { nodes: VisNode[], edges
   return { nodes: visNodes, edges: visEdges };
 };
 
-const printGraphOptions: VisOptions = {
-  autoResize: true,
-  interaction: { dragNodes: false, dragView: false, zoomView: false, selectable: false },
-  physics: { enabled: true, hierarchicalRepulsion: { nodeDistance: 160 } },
-  nodes: {
-    shape: 'box',
-    margin: { top: 8, right: 10, bottom: 8, left: 10 },
-    font: { color: '#333', face: 'monospace', size: 14 },
-    color: { background: '#fff', border: '#ccc' },
-    borderWidth: 1,
-    shadow: false
-  },
-  edges: {
-    arrows: 'to',
-    color: { color: '#999' },
-    smooth: { enabled: true, type: 'cubicBezier', roundness: 0.5 },
-    width: 1
-  },
-  layout: { hierarchical: { enabled: true, direction: 'UD', sortMethod: 'directed', levelSeparation: 100 } }
-};
-
 const downloadPdf = async () => {
   if (!reportContainer.value || !report.value) return;
   isGenerating.value = true;
   if (!props.hiddenRender) window.scrollTo(0, 0);
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  
+  await new Promise(resolve => setTimeout(resolve, 2000));
 
   try {
-    const opt = {
-      margin:       [10, 10, 10, 10] as [number, number, number, number],
-      filename:     `AlgoTrace_Report_${report.value.analysis_id}.pdf`,
-      image:        { type: 'jpeg' as const, quality: 0.98 },
-      html2canvas:  { scale: 1.5, useCORS: true, scrollY: 0, backgroundColor: '#ffffff' },
-      jsPDF:        { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
-      pagebreak:    { mode: ['css', 'legacy'], avoid: '.avoid-break' }
-    };
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    const margin = 12;
+    const maxContentWidth = pdfWidth - margin * 2;
+    const maxContentHeight = pdfHeight - margin * 2;
+    let currentY = margin;
 
-    await html2pdf().set(opt).from(reportContainer.value).save();
+    const chunks = reportContainer.value.querySelectorAll('.pdf-chunk');
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i] as HTMLElement;
+      if (chunk.offsetHeight === 0) continue;
+
+      const canvas = await html2canvas(chunk, { 
+        scale: 2, 
+        useCORS: true, 
+        logging: false, 
+        backgroundColor: isDarkMode.value ? '#212529' : '#ffffff',
+        onclone: (clonedDoc: Document) => {
+          const win = clonedDoc.defaultView;
+          if (win && win.HTMLCanvasElement) {
+            const origGetContext = win.HTMLCanvasElement.prototype.getContext;
+            if (!(origGetContext as unknown as { __patched?: boolean }).__patched) {
+              win.HTMLCanvasElement.prototype.getContext = function(this: HTMLCanvasElement, type: string, attributes?: CanvasRenderingContext2DSettings | undefined) {
+                if (type === '2d') {
+                  attributes = { ...(attributes || {}), willReadFrequently: true };
+                }
+                return origGetContext.call(this, type, attributes as CanvasRenderingContext2DSettings);
+              } as typeof HTMLCanvasElement.prototype.getContext;
+              (win.HTMLCanvasElement.prototype.getContext as unknown as { __patched?: boolean }).__patched = true;
+            }
+          }
+        }
+      });
+      if (canvas.width === 0 || canvas.height === 0) continue;
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      if (!imgData || imgData === 'data:,' || !imgData.startsWith('data:image')) continue;
+
+      const imgProps = pdf.getImageProperties(imgData);
+      const imgWidth = maxContentWidth;
+      const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+
+      if (currentY + imgHeight > pdfHeight - margin && currentY > margin + 5) {
+        pdf.addPage();
+        currentY = margin;
+      }
+
+      if (imgHeight > maxContentHeight) {
+        let heightLeft = imgHeight;
+        let position = 0;
+        while (heightLeft > 0) {
+          pdf.addImage(imgData, 'JPEG', margin, currentY - position, imgWidth, imgHeight);
+          heightLeft -= maxContentHeight;
+          position += maxContentHeight;
+          if (heightLeft > 0) { pdf.addPage(); currentY = margin; }
+        }
+        currentY = margin;
+      } else {
+        pdf.addImage(imgData, 'JPEG', margin, currentY, imgWidth, imgHeight);
+        currentY += imgHeight + 4;
+      }
+    }
+    pdf.save(`AlgoTrace_Report_${report.value.analysis_id}.pdf`);
   } catch (error) {
     console.error("Помилка генерації PDF:", error);
-    if (!props.hiddenRender) alert("Не вдалося згенерувати PDF-файл.");
   } finally {
     isGenerating.value = false;
     emit('pdf-generated');
@@ -323,170 +389,184 @@ const downloadPdf = async () => {
 </script>
 
 <template>
-  <div class="print-container bg-light" :class="{ 'min-vh-100 py-4': !hiddenRender }" v-if="report">
+  <div class="elegant-wrapper" :class="{ 'min-vh-100 py-5': !hiddenRender }" v-if="report">
     
-    <div v-if="!hiddenRender" class="no-print container mb-4 d-flex justify-content-between align-items-center">
-      <button @click="router.back()" class="btn btn-outline-secondary btn-sm fw-medium">
-        &larr; Назад
+    <div v-if="!hiddenRender" class="no-print container mb-4 d-flex justify-content-between align-items-center" style="max-width: 960px;">
+      <button @click="router.back()" class="btn-modern-ghost">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        Назад
       </button>
-      <button @click="downloadPdf" :disabled="isGenerating" class="btn btn-primary btn-sm fw-medium">
+      <button @click="downloadPdf" :disabled="isGenerating" class="btn-modern-primary">
         <span v-if="isGenerating" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
         {{ isGenerating ? 'Генерація...' : 'Завантажити PDF' }}
       </button>
     </div>
 
-    <div class="container document-page bg-white p-4 p-md-5 mx-auto" ref="reportContainer" style="max-width: 900px;">
+    <div class="container document-page p-4 p-md-5 mx-auto" ref="reportContainer" style="max-width: 960px;">
 
-<div class="border-bottom pb-4 mb-4 avoid-break">
-        <div class="d-flex justify-content-between align-items-end mb-4">
+      <div class="pdf-section pb-4 mb-5 pdf-chunk border-bottom-soft">
+        <div class="d-flex justify-content-between align-items-start mb-4">
           <div>
-            <h1 class="h3 fw-bold mb-1 text-dark">Звіт про аналіз схожості коду</h1>
-            <div class="text-muted small font-monospace">ID Аналізу: {{ report.analysis_id }}</div>
+            <h1 class="report-title">Звіт про аналіз схожості коду</h1>
+            <div class="report-meta">ID Аналізу: <span class="font-monospace text-dark">{{ report.analysis_id }}</span></div>
           </div>
-          </div>
+          <div class="brand-badge">AlgoTrace</div>
+        </div>
 
-        <div class="row g-3 mb-4" v-if="similarityStats">
-          <div class="col-3">
-            <div class="border p-2 px-3 h-100 rounded-1 text-center bg-light">
-              <div class="small text-muted text-uppercase fw-bold mb-1" style="font-size: 0.65rem;">Максимум</div>
-              <div class="h4 fw-bold mb-0" :style="`color: ${getScoreColorHex(similarityStats.max)}`">{{ similarityStats.max }}%</div>
-              <div class="text-muted text-truncate" style="font-size: 0.65rem;">
+        <div class="row g-4 mb-4" v-if="similarityStats">
+          <div class="col-6 col-md-3">
+            <div class="stat-card">
+              <div class="stat-label">Максимум</div>
+              <div class="stat-value" :style="`color: ${getScoreColorHex(similarityStats.max)}`">{{ similarityStats.max }}%</div>
+              <div class="stat-desc">
                 {{ similarityStats.maxAlgos.length === 1 ? similarityStats.maxAlgos[0] : similarityStats.maxAlgos.length + ' алг.' }}
               </div>
             </div>
           </div>
-          <div class="col-3">
-             <div class="border p-2 px-3 h-100 rounded-1 text-center bg-light">
-              <div class="small text-muted text-uppercase fw-bold mb-1" style="font-size: 0.65rem;">Середнє</div>
-              <div class="h4 fw-bold mb-0 text-dark">{{ similarityStats.avg }}%</div>
+          <div class="col-6 col-md-3">
+             <div class="stat-card">
+              <div class="stat-label">Середнє</div>
+              <div class="stat-value text-dark">{{ similarityStats.avg }}%</div>
+              <div class="stat-desc">Загальний тренд</div>
             </div>
           </div>
-          <div class="col-3">
-             <div class="border p-2 px-3 h-100 rounded-1 text-center bg-light">
-              <div class="small text-muted text-uppercase fw-bold mb-1" style="font-size: 0.65rem;">Медіана</div>
-              <div class="h4 fw-bold mb-0 text-dark">{{ similarityStats.median }}%</div>
+          <div class="col-6 col-md-3">
+             <div class="stat-card">
+              <div class="stat-label">Медіана</div>
+              <div class="stat-value text-dark">{{ similarityStats.median }}%</div>
+              <div class="stat-desc">Центральне знач.</div>
             </div>
           </div>
-          <div class="col-3">
-            <div class="border p-2 px-3 h-100 rounded-1 text-center bg-light">
-              <div class="small text-muted text-uppercase fw-bold mb-1" style="font-size: 0.65rem;">Мінімум</div>
-              <div class="h4 fw-bold mb-0" :style="`color: ${getScoreColorHex(similarityStats.min)}`">{{ similarityStats.min }}%</div>
-              <div class="text-muted text-truncate" style="font-size: 0.65rem;">
+          <div class="col-6 col-md-3">
+            <div class="stat-card">
+              <div class="stat-label">Мінімум</div>
+              <div class="stat-value" :style="`color: ${getScoreColorHex(similarityStats.min)}`">{{ similarityStats.min }}%</div>
+              <div class="stat-desc">
                 {{ similarityStats.minAlgos.length === 1 ? similarityStats.minAlgos[0] : similarityStats.minAlgos.length + ' алг.' }}
               </div>
             </div>
           </div>
         </div>
-        <div class="row g-3">
-          <div class="col-6">
-            <div class="border p-3 h-100 rounded-1">
-              <div class="small text-muted text-uppercase fw-bold mb-1">Файл 1</div>
-              <div class="fw-medium text-break font-monospace small">{{ report.source_files.name_a }}</div>
+
+        <div class="row g-4">
+          <div class="col-md-6">
+            <div class="file-card">
+              <div class="file-label">Вихідний файл 1</div>
+              <div class="file-name">{{ report.source_files.name_a }}</div>
             </div>
           </div>
-          <div class="col-6">
-            <div class="border p-3 h-100 rounded-1">
-              <div class="small text-muted text-uppercase fw-bold mb-1">Файл 2</div>
-              <div class="fw-medium text-break font-monospace small">{{ report.source_files.name_b }}</div>
+          <div class="col-md-6">
+            <div class="file-card">
+              <div class="file-label">Файл для порівняння 2</div>
+              <div class="file-name">{{ report.source_files.name_b }}</div>
             </div>
           </div>
         </div>
       </div>
 
-      <div v-for="(cat, cIdx) in report.categories_results" :key="cat.category_name" class="mb-4">
+      <div v-for="(cat, cIdx) in report.categories_results" :key="cat.category_name" class="mb-5">
         
-        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3 avoid-break mt-4">
-          <h2 class="h5 fw-bold m-0 text-dark">{{ cIdx + 1 }}. {{ formatCategoryName(cat.category_name) }}</h2>
-          <span class="badge border bg-light text-dark">Схожість: {{ formatScore(cat.category_similarity_score) }}</span>
+        <div class="pdf-section d-flex justify-content-between align-items-center mb-4 pdf-chunk category-header">
+          <h2 class="category-title">{{ cIdx + 1 }}. {{ formatCategoryName(cat.category_name) }}</h2>
+          <span class="score-pill">Схожість: <strong>{{ formatScore(cat.category_similarity_score) }}</strong></span>
         </div>
 
-        <div v-for="algo in cat.algorithms" :key="algo.method" class="mb-4 ps-3 border-start border-2 border-secondary border-opacity-25">
-          <div class="d-flex justify-content-between align-items-center mb-2 avoid-break">
-            <h3 class="h6 fw-bold m-0 text-secondary">{{ formatMethodName(algo.method) }}</h3>
-            <span class="small fw-medium">Збіг: {{ formatScore(algo.similarity_score) }}</span>
+        <div v-for="algo in cat.algorithms" :key="algo.method" class="pdf-section mb-5 ms-3 ps-4 algo-section">
+          <div class="d-flex justify-content-between align-items-center mb-3 pdf-chunk">
+            <h3 class="algo-title">{{ formatMethodName(algo.method) }}</h3>
+            <span class="algo-score">Збіг: {{ formatScore(algo.similarity_score) }}</span>
           </div>
 
           <div v-if="algo.evidence_type === 'text_highlight' && algo.evidence?.matched_blocks">
-            <div v-for="(block, bIdx) in algo.evidence.matched_blocks" :key="bIdx" class="border rounded-1 mb-3 avoid-break">
-              <div class="bg-light px-2 py-1 border-bottom small text-muted d-flex justify-content-between">
-                <span>Блок #{{ bIdx + 1 }}</span>
+            <div v-for="(block, bIdx) in algo.evidence.matched_blocks" :key="bIdx" class="evidence-card mb-4 pdf-chunk">
+              <div class="evidence-header d-flex justify-content-between">
+                <span class="fw-semibold text-dark">Блок #{{ bIdx + 1 }}</span>
                 <span>Рядки: {{ block.start_line_a }}-{{ block.end_line_a }} &rarr; {{ block.start_line_b }}-{{ block.end_line_b }}</span>
               </div>
               <div class="row g-0">
-                <div class="col-6 border-end">
-                  <pre class="m-0 p-2 code-block bg-white text-dark"><code>{{ block.content_a }}</code></pre>
+                <div class="col-6 border-end-soft">
+                  <pre class="code-block"><code>{{ block.content_a }}</code></pre>
                 </div>
                 <div class="col-6">
-                  <pre class="m-0 p-2 code-block bg-white text-dark"><code>{{ block.content_b }}</code></pre>
+                  <pre class="code-block"><code>{{ block.content_b }}</code></pre>
                 </div>
               </div>
             </div>
-            <div v-if="algo.evidence.matched_blocks.length === 0" class="text-muted small">Збігів не знайдено.</div>
+            <div v-if="algo.evidence.matched_blocks.length === 0" class="empty-state pdf-chunk">Збігів не знайдено.</div>
           </div>
 
           <div v-else-if="algo.evidence_type === 'token_sequence' && algo.evidence?.matched_hashes">
-            <table class="table table-sm table-bordered mb-0 avoid-break">
-              <thead class="table-light text-muted small">
+            <div class="pdf-chunk modern-table-wrapper">
+              <table class="modern-table">
+              <thead>
                 <tr>
                   <th>Послідовність токенів</th>
-                  <th class="text-center" style="width: 60px">Ф1</th>
-                  <th class="text-center" style="width: 60px">Ф2</th>
+                  <th class="text-center" style="width: 80px">Файл 1</th>
+                  <th class="text-center" style="width: 80px">Файл 2</th>
                 </tr>
               </thead>
-              <tbody class="small">
+              <tbody>
                 <tr v-for="(hash, hIdx) in algo.evidence.matched_hashes" :key="hIdx">
-                  <td class="font-monospace text-break">{{ hash.token_sequence }} <br><span class="text-muted" style="font-size: 0.7rem;">{{ hash.hash_value }}</span></td>
-                  <td class="text-center align-middle">{{ hasOccurrence(hash, 'a') ? '✓' : '-' }}</td>
-                  <td class="text-center align-middle">{{ hasOccurrence(hash, 'b') ? '✓' : '-' }}</td>
+                  <td class="font-monospace token-cell">
+                    {{ hash.token_sequence }} <br>
+                    <span class="hash-subtext">{{ hash.hash_value }}</span>
+                  </td>
+                  <td class="text-center align-middle">
+                    <span v-if="hasOccurrence(hash, 'a')" class="check-icon">✓</span>
+                    <span v-else class="dash-icon">—</span>
+                  </td>
+                  <td class="text-center align-middle">
+                    <span v-if="hasOccurrence(hash, 'b')" class="check-icon">✓</span>
+                    <span v-else class="dash-icon">—</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
+            </div>
           </div>
 
           <div v-else-if="algo.evidence_type === 'ast_tree_mapping'">
             <div v-if="Array.isArray(algo.evidence)">
-              <div v-for="(m, idx) in algo.evidence" :key="idx" class="border rounded-1 mb-2 avoid-break">
-                <div class="bg-light px-2 py-1 border-bottom small d-flex justify-content-between">
-                  <span class="fw-medium">{{ formatMatchType(m.type) }}</span>
-                  <span class="text-muted">{{ formatSeverity(m.severity) }}</span>
+              <div v-for="(m, idx) in algo.evidence" :key="idx" class="evidence-card mb-3 pdf-chunk">
+                <div class="evidence-header d-flex justify-content-between">
+                  <span class="fw-semibold text-dark">{{ formatMatchType(m.type) }}</span>
+                  <span class="badge-soft">{{ formatSeverity(m.severity) }}</span>
                 </div>
                 <div class="row g-0" v-if="(m.leftLines && m.leftLines.length) || (m.rightLines && m.rightLines.length)">
-                  <div class="col-6 border-end">
-                    <pre class="m-0 p-2 code-block"><code>{{ getLinesContent(report.source_files?.file_a, m.leftLines, 'ast_tree_mapping') }}</code></pre>
+                  <div class="col-6 border-end-soft">
+                    <pre class="code-block"><code>{{ getLinesContent(report.source_files?.file_a, m.leftLines, 'ast_tree_mapping') }}</code></pre>
                   </div>
                   <div class="col-6">
-                    <pre class="m-0 p-2 code-block"><code>{{ getLinesContent(report.source_files?.file_b, m.rightLines, 'ast_tree_mapping') }}</code></pre>
+                    <pre class="code-block"><code>{{ getLinesContent(report.source_files?.file_b, m.rightLines, 'ast_tree_mapping') }}</code></pre>
                   </div>
                 </div>
-                <div v-else class="p-2 text-muted small text-center">Структурний збіг для всього файлу</div>
+                <div v-else class="empty-state">Структурний збіг для всього файлу</div>
               </div>
             </div>
             
             <template v-else>
               <div v-if="algo.evidence?.full_nodes_a && algo.evidence?.full_nodes_b">
-                <div class="html2pdf__page-break"></div>
-                <h4 class="h6 fw-bold mb-2">Повне AST-дерево</h4>
-                <div class="border rounded-1 mb-3 avoid-break">
-                  <div class="bg-light px-2 py-1 border-bottom small fw-bold">Файл 1</div>
-                  <div class="graph-print-container"><InteractiveGraph :graph-data="buildASTVisData(algo.evidence.full_nodes_a, getMatchedASTNodeIds(algo.evidence, 'a'))" :options="printGraphOptions" height="300px" /></div>
+                <h4 class="sub-heading pdf-chunk">Повне AST-дерево</h4>
+                <div class="evidence-card mb-4 pdf-chunk">
+                  <div class="evidence-header fw-semibold">Файл 1</div>
+                  <div class="graph-print-container"><InteractiveGraph :graph-data="buildASTVisData(algo.evidence.full_nodes_a, getMatchedASTNodeIds(algo.evidence, 'a'))" height="300px" /></div>
                 </div>
-                <div class="border rounded-1 mb-3 avoid-break">
-                  <div class="bg-light px-2 py-1 border-bottom small fw-bold">Файл 2</div>
-                  <div class="graph-print-container"><InteractiveGraph :graph-data="buildASTVisData(algo.evidence.full_nodes_b, getMatchedASTNodeIds(algo.evidence, 'b'))" :options="printGraphOptions" height="300px" /></div>
+                <div class="evidence-card mb-4 pdf-chunk">
+                  <div class="evidence-header fw-semibold">Файл 2</div>
+                  <div class="graph-print-container"><InteractiveGraph :graph-data="buildASTVisData(algo.evidence.full_nodes_b, getMatchedASTNodeIds(algo.evidence, 'b'))" height="300px" /></div>
                 </div>
               </div>
               
               <div v-if="algo.evidence?.matched_subtrees">
-                <div class="html2pdf__page-break"></div>
-                <div v-for="(subtree, sIdx) in algo.evidence.matched_subtrees" :key="sIdx" class="mb-4">
-                  <h4 class="h6 fw-bold mb-2">Піддерево: {{ subtree.node_type }}</h4>
-                  <div class="border rounded-1 mb-2 avoid-break">
-                    <div class="bg-light px-2 py-1 border-bottom small fw-bold">Файл 1</div>
-                    <div class="graph-print-container"><InteractiveGraph :graph-data="buildASTVisData(subtree.nodes_a, getMatchedASTNodeIds(algo.evidence, 'a'))" :options="printGraphOptions" height="250px" /></div>
+                <div v-for="(subtree, sIdx) in algo.evidence.matched_subtrees" :key="sIdx" class="mb-5">
+                  <h4 class="sub-heading pdf-chunk">Піддерево: <span class="text-primary-soft">{{ subtree.node_type }}</span></h4>
+                  <div class="evidence-card mb-3 pdf-chunk">
+                    <div class="evidence-header fw-semibold">Файл 1</div>
+                    <div class="graph-print-container"><InteractiveGraph :graph-data="buildASTVisData(subtree.nodes_a, getMatchedASTNodeIds(algo.evidence, 'a'))" height="250px" /></div>
                   </div>
-                  <div class="border rounded-1 avoid-break">
-                    <div class="bg-light px-2 py-1 border-bottom small fw-bold">Файл 2</div>
-                    <div class="graph-print-container"><InteractiveGraph :graph-data="buildASTVisData(subtree.nodes_b, getMatchedASTNodeIds(algo.evidence, 'b'))" :options="printGraphOptions" height="250px" /></div>
+                  <div class="evidence-card pdf-chunk">
+                    <div class="evidence-header fw-semibold">Файл 2</div>
+                    <div class="graph-print-container"><InteractiveGraph :graph-data="buildASTVisData(subtree.nodes_b, getMatchedASTNodeIds(algo.evidence, 'b'))" height="250px" /></div>
                   </div>
                 </div>
               </div>
@@ -494,73 +574,74 @@ const downloadPdf = async () => {
           </div>
 
           <div v-else-if="algo.evidence_type === 'graph_mapping'">
-            <table class="table table-sm table-bordered mb-3 avoid-break" v-if="algo.evidence.matches && algo.evidence.matches.length > 0">
-              <thead class="table-light small">
+            <div class="pdf-chunk modern-table-wrapper mb-4" v-if="algo.evidence.matches && algo.evidence.matches.length > 0">
+              <table class="modern-table">
+              <thead>
                 <tr><th>Тип збігу</th><th>Рівень</th></tr>
               </thead>
-              <tbody class="small">
+              <tbody>
                 <tr v-for="(match, idx) in algo.evidence.matches" :key="idx">
-                  <td>{{ formatMatchType(match.type) }}</td>
-                  <td>{{ formatSeverity(match.severity) }}</td>
+                  <td class="fw-medium text-dark">{{ formatMatchType(match.type) }}</td>
+                  <td><span class="badge-soft">{{ formatSeverity(match.severity) }}</span></td>
                 </tr>
               </tbody>
             </table>
+            </div>
 
             <div v-if="algo.evidence.graph_a || algo.evidence.graph_b">
-              <div class="html2pdf__page-break"></div>
-              <div class="border rounded-1 mb-3 avoid-break" v-if="algo.evidence.graph_a">
-                <div class="bg-light px-2 py-1 border-bottom small fw-bold">CFG Файл 1</div>
-                <div class="graph-print-container border-bottom"><InteractiveGraph :graph-data="buildCFGVisData(algo.evidence.graph_a)" :options="printGraphOptions" height="300px" /></div>
+              <div class="evidence-card mb-4 pdf-chunk" v-if="algo.evidence.graph_a">
+                <div class="evidence-header fw-semibold">CFG Файл 1</div>
+                <div class="graph-print-container"><InteractiveGraph :graph-data="buildCFGVisData(algo.evidence.graph_a)" :is-graph="true" height="300px" /></div>
               </div>
-              <div class="border rounded-1 avoid-break" v-if="algo.evidence.graph_b">
-                <div class="bg-light px-2 py-1 border-bottom small fw-bold">CFG Файл 2</div>
-                <div class="graph-print-container border-bottom"><InteractiveGraph :graph-data="buildCFGVisData(algo.evidence.graph_b)" :options="printGraphOptions" height="300px" /></div>
+              <div class="evidence-card pdf-chunk" v-if="algo.evidence.graph_b">
+                <div class="evidence-header fw-semibold">CFG Файл 2</div>
+                <div class="graph-print-container"><InteractiveGraph :graph-data="buildCFGVisData(algo.evidence.graph_b)" :is-graph="true" height="300px" /></div>
               </div>
             </div>
           </div>
 
-          <div v-else-if="algo.evidence_type === 'metric_comparison'" class="avoid-break">
-            <div class="row g-3">
-              <div class="col-6">
-                <div class="border rounded-1 p-2 h-100">
-                  <div class="small fw-bold border-bottom pb-1 mb-2">Метрики: Файл 1</div>
-                  <table class="table table-sm table-borderless small mb-0">
+          <div v-else-if="algo.evidence_type === 'metric_comparison'" class="pdf-chunk">
+            <div class="row g-4">
+              <div class="col-md-6">
+                <div class="metric-card h-100">
+                  <div class="metric-header">Метрики: Файл 1</div>
+                  <table class="modern-table table-borderless">
                     <tbody>
-                      <tr v-for="(val, key) in algo.evidence.metrics_a" :key="key" class="border-bottom border-light">
-                        <td class="text-muted p-1">{{ formatMetricKey(String(key)) }}</td>
-                        <td class="text-end fw-medium p-1">{{ typeof val === 'number' && !Number.isInteger(val) ? val.toFixed(2) : val }}</td>
+                      <tr v-for="(val, key) in algo.evidence.metrics_a" :key="key">
+                        <td class="metric-key">{{ formatMetricKey(String(key)) }}</td>
+                        <td class="metric-val">{{ typeof val === 'number' && !Number.isInteger(val) ? val.toFixed(2) : val }}</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
               </div>
-              <div class="col-6">
-                <div class="border rounded-1 p-2 h-100">
-                  <div class="small fw-bold border-bottom pb-1 mb-2">Метрики: Файл 2</div>
-                  <table class="table table-sm table-borderless small mb-0">
+              <div class="col-md-6">
+                <div class="metric-card h-100">
+                  <div class="metric-header">Метрики: Файл 2</div>
+                  <table class="modern-table table-borderless">
                     <tbody>
-                      <tr v-for="(val, key) in algo.evidence.metrics_b" :key="key" class="border-bottom border-light">
-                        <td class="text-muted p-1">{{ formatMetricKey(String(key)) }}</td>
-                        <td class="text-end fw-medium p-1">{{ typeof val === 'number' && !Number.isInteger(val) ? val.toFixed(2) : val }}</td>
+                      <tr v-for="(val, key) in algo.evidence.metrics_b" :key="key">
+                        <td class="metric-key">{{ formatMetricKey(String(key)) }}</td>
+                        <td class="metric-val">{{ typeof val === 'number' && !Number.isInteger(val) ? val.toFixed(2) : val }}</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
               </div>
             </div>
-            <div v-if="algo.evidence.conclusion" class="mt-3 p-3 bg-light border rounded-1 small fw-medium">
-              Висновок: {{ algo.evidence.conclusion }}
+            <div v-if="algo.evidence.conclusion" class="conclusion-box mt-4">
+              <strong class="text-dark me-2">Висновок:</strong> {{ algo.evidence.conclusion }}
             </div>
           </div>
 
-          <div v-else class="bg-light p-2 border rounded-1">
-            <pre class="m-0 small text-muted code-block"><code>{{ JSON.stringify(algo.evidence, null, 2) }}</code></pre>
+          <div v-else class="evidence-card pdf-chunk">
+            <pre class="code-block m-0"><code>{{ JSON.stringify(algo.evidence, null, 2) }}</code></pre>
           </div>
         </div>
       </div>
 
-      <div class="text-center mt-5 pt-3 border-top avoid-break text-muted small">
-        <span class="fw-bold">AlgoTrace Report</span> &bull; Згенеровано: {{ new Date().toLocaleString() }}
+      <div class="pdf-section text-center mt-5 pt-4 border-top-soft text-muted small pdf-chunk footer-text">
+        <span class="fw-bold text-dark">AlgoTrace Report</span> &bull; Згенеровано: {{ new Date().toLocaleString() }}
       </div>
 
     </div>
@@ -570,69 +651,365 @@ const downloadPdf = async () => {
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@400;500;600;700&display=swap');
 
-.print-container {
-  font-family: 'Inter', system-ui, sans-serif;
-  color: #1a1d20;
+/* Глобальный светлый фон-подложка */
+.elegant-wrapper {
+  background-color: #f8fafc; /* Очень мягкий серо-синий фон */
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: #334155;
 }
 
-/* Document Page Wrapper for Screen */
+/* Основной лист документа */
 .document-page {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-  border: 1px solid #e0e0e0;
+  background-color: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px -10px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.02);
+  border: 1px solid #f1f5f9;
 }
 
+/* Кнопки */
+.btn-modern-ghost {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #475569;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+.btn-modern-ghost:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.btn-modern-primary {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  background: #0f172a; /* Глубокий slate для контраста в светлой теме */
+  border: 1px solid #0f172a;
+  border-radius: 8px;
+  color: #ffffff;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+.btn-modern-primary:hover {
+  background: #334155;
+  border-color: #334155;
+}
+
+/* Типографика */
+.report-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  margin-bottom: 0.25rem;
+}
+.report-meta {
+  color: #64748b;
+  font-size: 0.875rem;
+}
+.brand-badge {
+  background: #f1f5f9;
+  color: #334155;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Линии */
+.border-bottom-soft {
+  border-bottom: 1px solid #e2e8f0;
+}
+.border-top-soft {
+  border-top: 1px solid #e2e8f0;
+}
+.border-end-soft {
+  border-right: 1px solid #e2e8f0;
+}
+
+/* Статистика */
+.stat-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.25rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  transition: transform 0.2s ease;
+}
+.stat-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+.stat-value {
+  font-size: 1.875rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 0.25rem;
+}
+.stat-desc {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+/* Карточки файлов */
+.file-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+.file-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+.file-name {
+  font-family: 'Fira Code', monospace;
+  font-size: 0.875rem;
+  color: #0f172a;
+  word-break: break-all;
+}
+
+/* Секции категорий */
+.category-header {
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid #f1f5f9;
+}
+.category-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0;
+}
+.score-pill {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  color: #475569;
+}
+
+/* Алгоритмы */
+.algo-section {
+  border-left: 3px solid #e2e8f0;
+}
+.algo-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #334155;
+  margin: 0;
+}
+.algo-score {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #64748b;
+}
+
+/* Карточки контента (Evidence) */
+.evidence-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.evidence-header {
+  background: #f8fafc;
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+  color: #64748b;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* Блоки кода */
 .code-block {
   font-family: 'Fira Code', monospace;
-  font-size: 0.75rem;
-  line-height: 1.4;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: #f8fafc; /* Чёткий контрастный светлый текст */
+  background: #1e293b; /* Тёмно-синий/серый фон (Slate 800) */
+  margin: 0;
+  padding: 1rem;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
+/* Таблицы */
+.modern-table-wrapper {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.modern-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.modern-table th {
+  background: #f8fafc;
+  color: #64748b;
+  font-weight: 600;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+.modern-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+}
+.modern-table tr:last-child td {
+  border-bottom: none;
+}
+.token-cell {
+  word-break: break-all;
+}
+.hash-subtext {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+/* Иконки в таблицах */
+.check-icon {
+  color: #10b981;
+  font-weight: bold;
+}
+.dash-icon {
+  color: #cbd5e1;
+}
+
+/* Метрики */
+.metric-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 1rem;
+}
+.metric-header {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+.metric-key {
+  color: #64748b;
+  padding: 0.35rem 0 !important;
+}
+.metric-val {
+  font-weight: 500;
+  color: #0f172a;
+  text-align: right;
+  padding: 0.35rem 0 !important;
+}
+
+/* Доп. элементы */
+.badge-soft {
+  background: #f1f5f9;
+  color: #475569;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.sub-heading {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 0.75rem;
+}
+.text-primary-soft {
+  color: #3b82f6; /* Мягкий синий акцент */
+}
+.empty-state {
+  padding: 1.5rem;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.875rem;
+  background: #1e293b;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+.conclusion-box {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  padding: 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+}
+.row.g-0 > .col-6.border-end-soft {
+  border-right: 1px solid #334155 !important;
+  background-color: #1e293b;
+}
 .graph-print-container {
   height: auto;
   min-height: 250px;
-  background-color: #fcfcfc;
+  background-color: #1e293b; /* Тёмный фон вместо старого #fafafa */
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+.footer-text {
+  letter-spacing: 0.02em;
 }
 
-/* Print Specific Styles */
-@media print {
-  .no-print {
-    display: none !important;
-  }
-
-  .print-container {
-    background: transparent !important;
-  }
-
-  .document-page {
-    box-shadow: none !important;
-    border: none !important;
-    padding: 0 !important;
-    max-width: 100% !important;
-  }
-
-  .avoid-break {
-    page-break-inside: avoid;
-    break-inside: avoid;
-  }
-
-  .page-break {
-    page-break-before: always;
-  }
-
-  body {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-    background: white;
-  }
-
-  .bg-light {
-    background-color: #f8f9fa !important;
-  }
-
-  .border, .border-start, .border-bottom, .border-top, .border-end {
-    border-color: #dee2e6 !important;
-  }
-}
+/* Dark Mode Overrides (Ідентично до AnalyzerView) */
+[data-bs-theme="dark"] .elegant-wrapper { background-color: #212529; color: #adb5bd; }
+[data-bs-theme="dark"] .document-page { background-color: #212529; border-color: #495057; }
+[data-bs-theme="dark"] .btn-modern-ghost { border-color: #495057; color: #adb5bd; }
+[data-bs-theme="dark"] .btn-modern-ghost:hover { background: #343a40; color: #f8f9fa; }
+[data-bs-theme="dark"] .report-title,
+[data-bs-theme="dark"] .category-title,
+[data-bs-theme="dark"] .algo-title,
+[data-bs-theme="dark"] .stat-value,
+[data-bs-theme="dark"] .metric-val,
+[data-bs-theme="dark"] .file-name { color: #f8f9fa !important; }
+[data-bs-theme="dark"] .report-meta,
+[data-bs-theme="dark"] .stat-desc { color: #adb5bd !important; }
+[data-bs-theme="dark"] .brand-badge { background: #343a40; color: #f8f9fa; }
+[data-bs-theme="dark"] .border-bottom-soft,
+[data-bs-theme="dark"] .border-top-soft,
+[data-bs-theme="dark"] .border-end-soft { border-color: #495057 !important; }
+[data-bs-theme="dark"] .stat-card,
+[data-bs-theme="dark"] .file-card,
+[data-bs-theme="dark"] .evidence-card,
+[data-bs-theme="dark"] .metric-card { background: #2b3035; border-color: #495057; }
+[data-bs-theme="dark"] .category-header { border-bottom-color: #495057; }
+[data-bs-theme="dark"] .score-pill { background: #343a40; border-color: #495057; color: #f8f9fa; }
+[data-bs-theme="dark"] .algo-section { border-left-color: #495057; }
+[data-bs-theme="dark"] .algo-score { color: #adb5bd; }
+[data-bs-theme="dark"] .evidence-header { background: #343a40; color: #adb5bd; border-bottom-color: #495057; }
+[data-bs-theme="dark"] .modern-table-wrapper { border-color: #495057; }
+[data-bs-theme="dark"] .modern-table th { background: #343a40; color: #adb5bd; border-bottom-color: #495057; }
+[data-bs-theme="dark"] .modern-table td { border-bottom-color: #495057; color: #f8f9fa; }
+[data-bs-theme="dark"] .badge-soft { background: #343a40; color: #f8f9fa; }
+[data-bs-theme="dark"] .sub-heading { color: #f8f9fa; }
+[data-bs-theme="dark"] .text-primary-soft { color: #6ea8fe; }
+[data-bs-theme="dark"] .empty-state { background: #2b3035; color: #adb5bd; }
+[data-bs-theme="dark"] .conclusion-box { background: rgba(25, 135, 84, 0.15); border-color: rgba(25, 135, 84, 0.4); color: #75b798; }
+[data-bs-theme="dark"] .text-dark { color: #f8f9fa !important; }
+[data-bs-theme="dark"] .graph-print-container { background-color: #212529; }
 </style>
