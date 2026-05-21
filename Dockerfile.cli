@@ -1,0 +1,14 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+COPY ["AlgoTrace.CLI/AlgoTrace.CLI.csproj", "AlgoTrace.CLI/"]
+RUN dotnet restore "AlgoTrace.CLI/AlgoTrace.CLI.csproj"
+
+COPY ["AlgoTrace.CLI/", "AlgoTrace.CLI/"]
+WORKDIR "/src/AlgoTrace.CLI"
+RUN dotnet publish "AlgoTrace.CLI.csproj" -c Release -o /app/publish
+
+FROM mcr.microsoft.com/dotnet/runtime:10.0 AS final
+WORKDIR /app
+COPY --from=build /app/publish .
+ENTRYPOINT ["dotnet", "AlgoTrace.CLI.dll"]

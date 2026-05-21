@@ -1,7 +1,7 @@
-using AlgoTrace.Server.Interfaces;
-using AlgoTrace.Server.Models.DTO.Analysis;
 using System.Collections.Generic;
 using System.Linq;
+using AlgoTrace.Server.Interfaces;
+using AlgoTrace.Server.Models.DTO.Analysis;
 
 namespace AlgoTrace.Server.Algorithms.Token
 {
@@ -43,7 +43,13 @@ namespace AlgoTrace.Server.Algorithms.Token
                 .Where(hash => targetHashSet.Contains(hash))
                 .ToHashSet();
 
-            var rawMatches = new List<(int SourceIndex, int TargetIndex, List<TokenInfo> LeftTokens, List<TokenInfo> RightTokens)>();
+            var rawMatches =
+                new List<(
+                    int SourceIndex,
+                    int TargetIndex,
+                    List<TokenInfo> LeftTokens,
+                    List<TokenInfo> RightTokens
+                )>();
 
             foreach (var hash in commonHashes)
             {
@@ -60,7 +66,9 @@ namespace AlgoTrace.Server.Algorithms.Token
                             continue;
 
                         var tMatch = targetOccurrences[i];
-                        rawMatches.Add((sMatch.TokenIndex, tMatch.TokenIndex, sMatch.Tokens, tMatch.Tokens));
+                        rawMatches.Add(
+                            (sMatch.TokenIndex, tMatch.TokenIndex, sMatch.Tokens, tMatch.Tokens)
+                        );
 
                         usedTargetIndices.Add(i);
                         break;
@@ -101,7 +109,16 @@ namespace AlgoTrace.Server.Algorithms.Token
                     }
                     else
                     {
-                        mergedBlocks.Add(new Block(currentSourceStart, currentSourceEnd, currentTargetStart, currentTargetEnd, currentLeftTokens, currentRightTokens));
+                        mergedBlocks.Add(
+                            new Block(
+                                currentSourceStart,
+                                currentSourceEnd,
+                                currentTargetStart,
+                                currentTargetEnd,
+                                currentLeftTokens,
+                                currentRightTokens
+                            )
+                        );
 
                         currentSourceStart = next.SourceIndex;
                         currentSourceEnd = currentSourceStart + K;
@@ -112,10 +129,21 @@ namespace AlgoTrace.Server.Algorithms.Token
                     }
                 }
 
-                mergedBlocks.Add(new Block(currentSourceStart, currentSourceEnd, currentTargetStart, currentTargetEnd, currentLeftTokens, currentRightTokens));
+                mergedBlocks.Add(
+                    new Block(
+                        currentSourceStart,
+                        currentSourceEnd,
+                        currentTargetStart,
+                        currentTargetEnd,
+                        currentLeftTokens,
+                        currentRightTokens
+                    )
+                );
             }
 
-            mergedBlocks = mergedBlocks.OrderByDescending(b => b.SourceEnd - b.SourceStart).ToList();
+            mergedBlocks = mergedBlocks
+                .OrderByDescending(b => b.SourceEnd - b.SourceStart)
+                .ToList();
             var finalBlocks = new List<Block>();
             var usedSourceIntervals = new List<(int start, int end)>();
             var usedTargetIntervals = new List<(int start, int end)>();
@@ -132,7 +160,8 @@ namespace AlgoTrace.Server.Algorithms.Token
                         break;
                     }
                 }
-                if (overlaps) continue;
+                if (overlaps)
+                    continue;
 
                 foreach (var interval in usedTargetIntervals)
                 {
@@ -142,7 +171,8 @@ namespace AlgoTrace.Server.Algorithms.Token
                         break;
                     }
                 }
-                if (overlaps) continue;
+                if (overlaps)
+                    continue;
 
                 finalBlocks.Add(block);
                 usedSourceIntervals.Add((block.SourceStart, block.SourceEnd));
@@ -150,7 +180,10 @@ namespace AlgoTrace.Server.Algorithms.Token
             }
 
             int matchedSourceTokensCount = finalBlocks.Sum(b => b.LeftTokens.Count);
-            similarityScore = sourceTokens.Count > 0 ? ((double)matchedSourceTokensCount / sourceTokens.Count) * 100 : 0;
+            similarityScore =
+                sourceTokens.Count > 0
+                    ? ((double)matchedSourceTokensCount / sourceTokens.Count) * 100
+                    : 0;
 
             var matches = new List<DetailedMatch>();
             int matchId = 5000;
@@ -158,30 +191,39 @@ namespace AlgoTrace.Server.Algorithms.Token
 
             foreach (var block in finalBlocks.OrderBy(b => b.SourceStart))
             {
-                matches.Add(new DetailedMatch
-                {
-                    Id = matchId++,
-                    Type = "Token Sequence Match",
-                    Severity = severity,
-                    LeftLines = new List<int>
+                matches.Add(
+                    new DetailedMatch
                     {
-                        block.LeftTokens.First().Line,
-                        block.LeftTokens.Last().Line
-                    },
-                    RightLines = new List<int>
-                    {
-                        block.RightTokens.First().Line,
-                        block.RightTokens.Last().Line
-                    },
-                    LeftTokens = block.LeftTokens,
-                    RightTokens = block.RightTokens
-                });
+                        Id = matchId++,
+                        Type = "Token Sequence Match",
+                        Severity = severity,
+                        LeftLines = new List<int>
+                        {
+                            block.LeftTokens.First().Line,
+                            block.LeftTokens.Last().Line,
+                        },
+                        RightLines = new List<int>
+                        {
+                            block.RightTokens.First().Line,
+                            block.RightTokens.Last().Line,
+                        },
+                        LeftTokens = block.LeftTokens,
+                        RightTokens = block.RightTokens,
+                    }
+                );
             }
 
             return matches;
         }
 
-        private record Block(int SourceStart, int SourceEnd, int TargetStart, int TargetEnd, List<TokenInfo> LeftTokens, List<TokenInfo> RightTokens);
+        private record Block(
+            int SourceStart,
+            int SourceEnd,
+            int TargetStart,
+            int TargetEnd,
+            List<TokenInfo> LeftTokens,
+            List<TokenInfo> RightTokens
+        );
 
         private record Fingerprint(int Hash, int TokenIndex, List<TokenInfo> Tokens);
 

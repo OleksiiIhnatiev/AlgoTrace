@@ -18,7 +18,7 @@ services:
       dockerfile: Dockerfile
     container_name: algotrace_web
     ports:
-      - "8080:8080"
+      - "8888:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__DefaultConnection=Server=db;Database=AlgoTraceDB;User Id=sa;Password=Your_Strong_Password_123!;TrustServerCertificate=True;
