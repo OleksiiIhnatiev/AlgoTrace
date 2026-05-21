@@ -29,7 +29,13 @@
         <li><a href="#installation-&-launch">Installation & Launch</a></li>
       </ul>
     </li>
-    <li><a href="#usage">Usage</a></li>
+    <li>
+      <a href="#usage">Usage</a>
+      <ul>
+        <li><a href="#web-interface">Web Interface</a></li>
+        <li><a href="#command-line-interface-cli">Command Line Interface (CLI)</a></li>
+      </ul>
+    </li>
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#contact">Contact</a></li>
@@ -85,7 +91,7 @@ You will need to have Docker installed on your machine to build and run the cont
    ```
 4. Once the containers are running, open your browser and navigate to:
    ```text
-   http://localhost:8080/
+   http://localhost:8888/
    ```
 ### Managing the Application
 
@@ -104,10 +110,34 @@ You will need to have Docker installed on your machine to build and run the cont
 <!-- USAGE EXAMPLES -->
 ## Usage
 
+### Web Interface
+
 1. **Register/Login:** Create a new account or log into the application.
 2. **Upload Code:** Use the dashboard to either paste code snippets directly or upload files (e.g., `.cs`, `.py`, `.js`).
 3. **Select Algorithms:** Choose the depth of your analysis (Textual, Token-based, Tree/AST, or Graph).
 4. **Review Results:** The app will generate a detailed report showing side-by-side comparisons, matched lines, and an overall similarity score.
+
+### Command Line Interface (CLI)
+
+For quick, automated checks without using the web UI, you can use the AlgoTrace CLI tool via Docker. This is especially useful for educators checking student assignments.
+
+1. Ensure the main server is running:
+   ```sh
+   docker-compose up -d
+   ```
+2. Build the CLI Docker image (only needed once):
+   ```sh
+   docker build -t algotrace-cli -f Dockerfile.cli .
+   ```
+3. Run the CLI to compare two local files (replace `code1.py` and `code2.py` with your file names):
+   * **Windows (CMD):**
+     ```cmd
+     docker run --rm -v "%cd%:/workspace" algotrace-cli /workspace/code1.py /workspace/code2.py http://host.docker.internal:8888
+     ```
+   * **Linux / Mac / Windows (PowerShell):**
+     ```bash
+     docker run --rm -v "${PWD}:/workspace" algotrace-cli /workspace/code1.py /workspace/code2.py http://host.docker.internal:8888
+     ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

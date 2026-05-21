@@ -3,5 +3,6 @@
     <Build />
     <Deploy />
   </Project>
+  <Project Path="AlgoTrace.CLI/AlgoTrace.CLI.csproj" />
   <Project Path="AlgoTrace.Server/AlgoTrace.Server.csproj" />
 </Solution>
