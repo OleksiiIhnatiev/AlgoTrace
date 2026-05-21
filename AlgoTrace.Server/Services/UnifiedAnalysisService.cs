@@ -223,7 +223,12 @@ namespace AlgoTrace.Server.Services
 
                 foreach (var match in matches)
                 {
-                    if (match.LeftTokens == null || match.RightTokens == null || !match.LeftTokens.Any() || !match.RightTokens.Any())
+                    if (
+                        match.LeftTokens == null
+                        || match.RightTokens == null
+                        || !match.LeftTokens.Any()
+                        || !match.RightTokens.Any()
+                    )
                         continue;
 
                     var matchedSequence = new MatchedSequence
@@ -231,30 +236,34 @@ namespace AlgoTrace.Server.Services
                         SequenceId = match.Id.ToString(),
                         Type = match.Type,
                         Occurrences = new List<SequenceOccurrence>
-                {
-                    new SequenceOccurrence
-                    {
-                        Submission = "a",
-                        Tokens = match.LeftTokens.Select(t => new EvidenceToken
                         {
-                            Value = t.Value,
-                            Line = t.Line,
-                            StartIndex = t.StartIndex,
-                            EndIndex = t.EndIndex
-                        }).ToList()
-                    },
-                    new SequenceOccurrence
-                    {
-                        Submission = "b",
-                        Tokens = match.RightTokens.Select(t => new EvidenceToken
-                        {
-                            Value = t.Value,
-                            Line = t.Line,
-                            StartIndex = t.StartIndex,
-                            EndIndex = t.EndIndex
-                        }).ToList()
-                    }
-                }
+                            new SequenceOccurrence
+                            {
+                                Submission = "a",
+                                Tokens = match
+                                    .LeftTokens.Select(t => new EvidenceToken
+                                    {
+                                        Value = t.Value,
+                                        Line = t.Line,
+                                        StartIndex = t.StartIndex,
+                                        EndIndex = t.EndIndex,
+                                    })
+                                    .ToList(),
+                            },
+                            new SequenceOccurrence
+                            {
+                                Submission = "b",
+                                Tokens = match
+                                    .RightTokens.Select(t => new EvidenceToken
+                                    {
+                                        Value = t.Value,
+                                        Line = t.Line,
+                                        StartIndex = t.StartIndex,
+                                        EndIndex = t.EndIndex,
+                                    })
+                                    .ToList(),
+                            },
+                        },
                     };
 
                     evidence.MatchedSequences.Add(matchedSequence);
@@ -491,20 +500,50 @@ namespace AlgoTrace.Server.Services
 
             // Добавлена новая группа <Symbol> для захвата всех операторов и знаков препинания.
             // Теперь скобки, математика и логика не будут исчезать из отпечатков.
-            var pattern = @"(?<Comment>//.*?$|/\*[\s\S]*?\*/|#.*?$)|(?<String>@""(?:[^""]|"""")*""|""(?:\\.|[^\\""])*""|'(?:\\.|[^\\'])*'|`(?:\\.|[^\\`])*`)|(?<Number>\b\d+(?:\.\d+)?\b)|(?<Word>[a-zA-Z_][a-zA-Z0-9_]*)|(?<Symbol>[{}()[\].,;:+\-*/%&|^!=<>?~]+)";
+            var pattern =
+                @"(?<Comment>//.*?$|/\*[\s\S]*?\*/|#.*?$)|(?<String>@""(?:[^""]|"""")*""|""(?:\\.|[^\\""])*""|'(?:\\.|[^\\'])*'|`(?:\\.|[^\\`])*`)|(?<Number>\b\d+(?:\.\d+)?\b)|(?<Word>[a-zA-Z_][a-zA-Z0-9_]*)|(?<Symbol>[{}()[\].,;:+\-*/%&|^!=<>?~]+)";
 
             var lineStarts = new List<int> { 0 };
             for (int i = 0; i < code.Length; i++)
             {
-                if (code[i] == '\n') lineStarts.Add(i + 1);
+                if (code[i] == '\n')
+                    lineStarts.Add(i + 1);
             }
 
             var keywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                {
-                    "if", "else", "elif", "for", "while", "return", "class", "public", "private", "protected",
-                    "static", "int", "string", "void", "var", "let", "const", "function", "def", "bool", "boolean",
-                    "import", "using", "include", "namespace", "package", "new", "switch", "case", "default", "break"
-                };
+            {
+                "if",
+                "else",
+                "elif",
+                "for",
+                "while",
+                "return",
+                "class",
+                "public",
+                "private",
+                "protected",
+                "static",
+                "int",
+                "string",
+                "void",
+                "var",
+                "let",
+                "const",
+                "function",
+                "def",
+                "bool",
+                "boolean",
+                "import",
+                "using",
+                "include",
+                "namespace",
+                "package",
+                "new",
+                "switch",
+                "case",
+                "default",
+                "break",
+            };
 
             var matches = Regex.Matches(code, pattern, RegexOptions.Multiline);
 
@@ -538,13 +577,15 @@ namespace AlgoTrace.Server.Services
                     if (lineIndex < 0)
                         lineIndex = ~lineIndex - 1;
 
-                    tokens.Add(new TokenInfo
-                    {
-                        Value = tokenValue,
-                        Line = lineIndex + 1,
-                        StartIndex = match.Index,
-                        EndIndex = match.Index + match.Length
-                    });
+                    tokens.Add(
+                        new TokenInfo
+                        {
+                            Value = tokenValue,
+                            Line = lineIndex + 1,
+                            StartIndex = match.Index,
+                            EndIndex = match.Index + match.Length,
+                        }
+                    );
                 }
             }
 

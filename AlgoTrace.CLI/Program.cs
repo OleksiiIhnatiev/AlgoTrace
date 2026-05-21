@@ -13,7 +13,9 @@ namespace AlgoTrace.CLI
         {
             if (args.Length < 2)
             {
-                Console.WriteLine("Використання: AlgoTrace.CLI <file_path_1> <file_path_2> [api_url]");
+                Console.WriteLine(
+                    "Використання: AlgoTrace.CLI <file_path_1> <file_path_2> [api_url]"
+                );
                 Console.WriteLine("Приклад: AlgoTrace.CLI file1.py file2.py http://localhost:8080");
                 return;
             }
@@ -39,7 +41,8 @@ namespace AlgoTrace.CLI
             string ext = Path.GetExtension(file1).TrimStart('.').ToLower();
 
             // Автоматичне визначення мови на основі розширення
-            string language = ext switch {
+            string language = ext switch
+            {
                 "py" => "python",
                 "cs" => "csharp",
                 "js" or "jsx" => "javascript",
@@ -49,14 +52,26 @@ namespace AlgoTrace.CLI
                 "go" => "go",
                 "rs" => "rust",
                 "php" => "php",
-                _ => "python" // За замовчуванням
+                _ => "python", // За замовчуванням
             };
 
             var requestBody = new
             {
                 language = language,
-                submission_a = new { files = new[] { new { filename = Path.GetFileName(file1), content = content1 } } },
-                submission_b = new { files = new[] { new { filename = Path.GetFileName(file2), content = content2 } } },
+                submission_a = new
+                {
+                    files = new[]
+                    {
+                        new { filename = Path.GetFileName(file1), content = content1 },
+                    },
+                },
+                submission_b = new
+                {
+                    files = new[]
+                    {
+                        new { filename = Path.GetFileName(file2), content = content2 },
+                    },
+                },
                 analysis_config = new
                 {
                     parameters = new { ignore_comments = true, ignore_whitespace = true },
@@ -66,9 +81,9 @@ namespace AlgoTrace.CLI
                         token_based = new[] { "winnowing", "jaccard_token" },
                         tree_based = new[] { "ast_compare", "ast_hashing" },
                         graph_based = new[] { "cfg", "pdg" },
-                        metrics_based = new[] { "halstead", "mccabe" }
-                    }
-                }
+                        metrics_based = new[] { "halstead", "mccabe" },
+                    },
+                },
             };
 
             string jsonBody = JsonSerializer.Serialize(requestBody);
@@ -83,7 +98,7 @@ namespace AlgoTrace.CLI
             {
                 var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
                 var response = await client.PostAsync($"{apiUrl}/api/analysis/unified", content);
-                
+
                 if (!response.IsSuccessStatusCode)
                 {
                     Console.WriteLine($"❌ Помилка сервера: {response.StatusCode}");
@@ -94,10 +109,10 @@ namespace AlgoTrace.CLI
 
                 string responseStr = await response.Content.ReadAsStringAsync();
                 using var doc = JsonDocument.Parse(responseStr);
-                
+
                 var root = doc.RootElement;
                 double score = root.GetProperty("global_similarity_score").GetDouble() * 100; // Множимо на 100 для відсотків
-                
+
                 Console.WriteLine();
                 Console.ForegroundColor = GetColorForScore(score);
                 Console.WriteLine($"=================================================");
@@ -112,10 +127,13 @@ namespace AlgoTrace.CLI
                     foreach (var cat in categories.EnumerateArray())
                     {
                         string catName = cat.GetProperty("category_name").GetString();
-                        double catScore = cat.GetProperty("category_similarity_score").GetDouble() * 100;
+                        double catScore =
+                            cat.GetProperty("category_similarity_score").GetDouble() * 100;
 
                         Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.WriteLine($"\n▶ {FormatCategoryName(catName)} (Схожість: {catScore:0.##}%)");
+                        Console.WriteLine(
+                            $"\n▶ {FormatCategoryName(catName)} (Схожість: {catScore:0.##}%)"
+                        );
                         Console.ResetColor();
 
                         if (cat.TryGetProperty("algorithms", out var algos))
@@ -123,7 +141,8 @@ namespace AlgoTrace.CLI
                             foreach (var algo in algos.EnumerateArray())
                             {
                                 string algoName = algo.GetProperty("method").GetString();
-                                double algoScore = algo.GetProperty("similarity_score").GetDouble() * 100;
+                                double algoScore =
+                                    algo.GetProperty("similarity_score").GetDouble() * 100;
 
                                 Console.Write($"  - {FormatMethodName(algoName).PadRight(30)} : ");
                                 Console.ForegroundColor = GetColorForScore(algoScore);
@@ -138,7 +157,9 @@ namespace AlgoTrace.CLI
             catch (HttpRequestException)
             {
                 Console.WriteLine($"❌ Помилка з'єднання з API.");
-                Console.WriteLine("Переконайтеся, що основний сервер (docker-compose) запущений і доступний.");
+                Console.WriteLine(
+                    "Переконайтеся, що основний сервер (docker-compose) запущений і доступний."
+                );
             }
             catch (Exception ex)
             {
@@ -148,36 +169,42 @@ namespace AlgoTrace.CLI
 
         static ConsoleColor GetColorForScore(double score)
         {
-            if (score < 30) return ConsoleColor.Green;
-            if (score < 70) return ConsoleColor.Yellow;
+            if (score < 30)
+                return ConsoleColor.Green;
+            if (score < 70)
+                return ConsoleColor.Yellow;
             return ConsoleColor.Red;
         }
 
-        static string FormatCategoryName(string name) => name switch {
-            "text_based" => "Текстовий аналіз",
-            "token_based" => "Токенний аналіз",
-            "tree_based" => "Аналіз AST-дерев",
-            "graph_based" => "Аналіз графів (CFG/PDG)",
-            "metrics_based" => "Метрики коду",
-            _ => name
-        };
+        static string FormatCategoryName(string name) =>
+            name switch
+            {
+                "text_based" => "Текстовий аналіз",
+                "token_based" => "Токенний аналіз",
+                "tree_based" => "Аналіз AST-дерев",
+                "graph_based" => "Аналіз графів (CFG/PDG)",
+                "metrics_based" => "Метрики коду",
+                _ => name,
+            };
 
-        static string FormatMethodName(string name) => name switch {
-            "levenshtein" => "Відстань Левенштейна",
-            "line_matching" => "Порядкове порівняння",
-            "rabin_karp" => "Алгоритм Рабіна-Карпа",
-            "ngram_search" => "Пошук за N-грамами",
-            "jaccard_token" => "Токени Джаккарда",
-            "winnowing" => "Вінновінг (Winnowing)",
-            "ast_hashing" => "Хешування AST",
-            "ast_compare" => "Пряме порівняння AST",
-            "subtree_isomorphism" => "Ізоморфізм піддерев",
-            "cfg" => "Граф потоку керування (CFG)",
-            "pdg" => "Граф залежностей даних (PDG)",
-            "subgraph_isomorphism" => "Ізоморфізм підграфів",
-            "halstead" => "Метрики Холстеда",
-            "mccabe" => "Складність Маккейба",
-            _ => name.Replace("_", " ")
-        };
+        static string FormatMethodName(string name) =>
+            name switch
+            {
+                "levenshtein" => "Відстань Левенштейна",
+                "line_matching" => "Порядкове порівняння",
+                "rabin_karp" => "Алгоритм Рабіна-Карпа",
+                "ngram_search" => "Пошук за N-грамами",
+                "jaccard_token" => "Токени Джаккарда",
+                "winnowing" => "Вінновінг (Winnowing)",
+                "ast_hashing" => "Хешування AST",
+                "ast_compare" => "Пряме порівняння AST",
+                "subtree_isomorphism" => "Ізоморфізм піддерев",
+                "cfg" => "Граф потоку керування (CFG)",
+                "pdg" => "Граф залежностей даних (PDG)",
+                "subgraph_isomorphism" => "Ізоморфізм підграфів",
+                "halstead" => "Метрики Холстеда",
+                "mccabe" => "Складність Маккейба",
+                _ => name.Replace("_", " "),
+            };
     }
 }
