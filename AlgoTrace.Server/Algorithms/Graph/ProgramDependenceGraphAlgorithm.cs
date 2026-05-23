@@ -68,7 +68,7 @@ namespace AlgoTrace.Server.Algorithms.Graph
                 for (int i = 0; i < dataEdgesB.Count; i++)
                 {
                     if (usedEdgesB.Contains(i))
-                        continue; 
+                        continue;
 
                     var edgeB = dataEdgesB[i];
 
@@ -99,7 +99,7 @@ namespace AlgoTrace.Server.Algorithms.Graph
                     )
                     {
                         edgeMatches++;
-                        usedEdgesB.Add(i); 
+                        usedEdgesB.Add(i);
 
                         matches.Add(
                             new DetailedMatch
@@ -120,7 +120,7 @@ namespace AlgoTrace.Server.Algorithms.Graph
                             }
                         );
 
-                        break; 
+                        break;
                     }
                 }
             }

@@ -83,7 +83,7 @@ namespace AlgoTrace.Server.Algorithms.Graph
                 var gNode = new GraphNode
                 {
                     Id = currentId,
-                    LineIndex = currentId, 
+                    LineIndex = currentId,
                     Content = string.IsNullOrWhiteSpace(node.Value) ? node.Type : node.Value,
                     Type = node.Type,
                 };

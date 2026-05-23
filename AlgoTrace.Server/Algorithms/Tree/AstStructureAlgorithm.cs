@@ -52,7 +52,7 @@ namespace AlgoTrace.Server.Algorithms.Tree
             void TraverseAndMatch(UniversalNode nodeA)
             {
                 int sizeA = GetSubtreeSize(nodeA);
-                
+
                 if (sizeA < 3)
                     return;
 
@@ -82,7 +82,6 @@ namespace AlgoTrace.Server.Algorithms.Tree
                                 .ToList(),
                         }
                     );
-
                 }
                 else
                 {

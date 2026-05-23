@@ -78,7 +78,7 @@ namespace AlgoTrace.Server.Algorithms.Tree
                             Type = "Identical Subtree Found",
                             Severity = "high",
                             LeftLines = GetLineRange(matchedNodeA),
-                            RightLines = new List<int>(), 
+                            RightLines = new List<int>(),
                         }
                     );
                 }

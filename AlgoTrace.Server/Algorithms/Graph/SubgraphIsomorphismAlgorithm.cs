@@ -37,7 +37,7 @@ namespace AlgoTrace.Server.Algorithms.Graph
             {
                 return matches;
             }
-            
+
             bool ignoreWhitespace = true;
             if (parameters != null && parameters.TryGetValue("ignore_whitespace", out var wVal))
             {
