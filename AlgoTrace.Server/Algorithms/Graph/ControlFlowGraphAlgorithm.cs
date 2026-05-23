@@ -50,9 +50,6 @@ namespace AlgoTrace.Server.Algorithms.Graph
             int countA = graphA.Nodes.Count;
             int countB = graphB.Nodes.Count;
 
-            // ==========================================
-            // ШАГ 1: Поиск базового маппинга узлов (Vertices)
-            // ==========================================
             int[,] dp = new int[countA + 1, countB + 1];
 
             for (int i = 1; i <= countA; i++)
@@ -80,7 +77,6 @@ namespace AlgoTrace.Server.Algorithms.Graph
                 }
             }
 
-            // Восстанавливаем карту соответствий (какой NodeId из A перешел в какой NodeId из B)
             var mappedNodesAtoB = new Dictionary<int, int>();
 
             int x = countA;
@@ -100,7 +96,6 @@ namespace AlgoTrace.Server.Algorithms.Graph
 
                 if (nodeA.Type == nodeB.Type && contentA == contentB)
                 {
-                    // Сохраняем маппинг для проверки ребер
                     mappedNodesAtoB[nodeA.Id] = nodeB.Id;
 
                     matches.Add(
@@ -129,29 +124,21 @@ namespace AlgoTrace.Server.Algorithms.Graph
             matches.Reverse();
             int matchedNodesCount = mappedNodesAtoB.Count;
 
-            // ==========================================
-            // ШАГ 2: Проверка топологии графа (Edges)
-            // ==========================================
             int matchedEdgesCount = 0;
 
-            // Создаем Hash-таблицу связей файла B для O(1) поиска
             var edgesSetB = new HashSet<string>();
             foreach (var edgeB in graphB.Edges)
             {
-                // Уникальная сигнатура ребра: Откуда_Куда_Тип
                 edgesSetB.Add($"{edgeB.SourceId}_{edgeB.TargetId}_{edgeB.Type}");
             }
 
-            // Проверяем каждое ребро из главного файла А
             foreach (var edgeA in graphA.Edges)
             {
-                // Если оба узла этого ребра имеют совпадения в файле B...
                 if (
                     mappedNodesAtoB.TryGetValue(edgeA.SourceId, out int mappedSourceB)
                     && mappedNodesAtoB.TryGetValue(edgeA.TargetId, out int mappedTargetB)
                 )
                 {
-                    // Проверяем, существует ли в файле B точно такая же связь между этими узлами
                     string expectedEdgeSignatureB = $"{mappedSourceB}_{mappedTargetB}_{edgeA.Type}";
 
                     if (edgesSetB.Contains(expectedEdgeSignatureB))
@@ -161,9 +148,6 @@ namespace AlgoTrace.Server.Algorithms.Graph
                 }
             }
 
-            // ==========================================
-            // ШАГ 3: Итоговый расчет 100% честного CFG
-            // ==========================================
             double totalElementsA = graphA.Nodes.Count + graphA.Edges.Count;
             double totalMatchedElements = matchedNodesCount + matchedEdgesCount;
 

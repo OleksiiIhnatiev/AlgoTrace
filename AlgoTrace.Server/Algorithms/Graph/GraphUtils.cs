@@ -83,19 +83,16 @@ namespace AlgoTrace.Server.Algorithms.Graph
                 var gNode = new GraphNode
                 {
                     Id = currentId,
-                    LineIndex = currentId, // В идеале здесь должен быть node.Location.Line, если он есть
+                    LineIndex = currentId,
                     Content = string.IsNullOrWhiteSpace(node.Value) ? node.Type : node.Value,
                     Type = node.Type,
                 };
 
-                // ИСПРАВЛЕНИЕ: Ищем переменные ТОЛЬКО в node.Value (реальном коде),
-                // а не в gNode.Content (куда может попасть тип AST-узла).
                 if (includeDataDeps && !string.IsNullOrWhiteSpace(node.Value))
                 {
                     var matches = Regex.Matches(node.Value, @"\b[a-zA-Z_][a-zA-Z0-9_]*\b");
                     foreach (Match m in matches)
                     {
-                        // Игнорируем синтаксис C#, берем только реальные названия переменных
                         if (!_csharpKeywords.Contains(m.Value))
                         {
                             gNode.Variables.Add(m.Value);
@@ -141,7 +138,6 @@ namespace AlgoTrace.Server.Algorithms.Graph
 
             Traverse(rootNode);
 
-            // Построение связей данных (теперь безопасно!)
             if (includeDataDeps)
             {
                 for (int i = 0; i < graph.Nodes.Count; i++)
