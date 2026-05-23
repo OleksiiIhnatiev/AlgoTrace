@@ -52,16 +52,13 @@ namespace AlgoTrace.Server.Algorithms.Graph
             if (dataEdgesA.Count == 0)
                 return matches;
 
-            // 1. ОПТИМИЗАЦИЯ: Создаем словари для мгновенного поиска узлов O(1)
             var nodesA = graphA.Nodes.ToDictionary(n => n.Id);
             var nodesB = graphB.Nodes.ToDictionary(n => n.Id);
 
-            // 2. ЗАЩИТА ОТ "ЖАДНОСТИ": Храним индексы использованных связей из B
             var usedEdgesB = new HashSet<int>();
 
             foreach (var edgeA in dataEdgesA)
             {
-                // Мгновенно достаем узлы из словаря
                 if (
                     !nodesA.TryGetValue(edgeA.SourceId, out var srcA)
                     || !nodesA.TryGetValue(edgeA.TargetId, out var tgtA)
@@ -71,7 +68,7 @@ namespace AlgoTrace.Server.Algorithms.Graph
                 for (int i = 0; i < dataEdgesB.Count; i++)
                 {
                     if (usedEdgesB.Contains(i))
-                        continue; // Это ребро из B уже учтено для другого ребра из A
+                        continue; 
 
                     var edgeB = dataEdgesB[i];
 
@@ -81,9 +78,6 @@ namespace AlgoTrace.Server.Algorithms.Graph
                     )
                         continue;
 
-                    // 3. УСИЛЕННОЕ УСЛОВИЕ: Сравниваем и Тип, и Контент
-                    // (Если плагиатор переименует переменные, Content не совпадет, но тип совпадет.
-                    // Если хотите сделать проверку мягче, оставьте только Type, но тогда ждите ложных срабатываний).
                     var srcContentA = ignoreWhitespace
                         ? SourceNormalizer.NormalizeLine(srcA.Content, true)
                         : srcA.Content;
@@ -105,7 +99,7 @@ namespace AlgoTrace.Server.Algorithms.Graph
                     )
                     {
                         edgeMatches++;
-                        usedEdgesB.Add(i); // Помечаем ребро из B как "сгоревшее"
+                        usedEdgesB.Add(i); 
 
                         matches.Add(
                             new DetailedMatch
@@ -126,12 +120,11 @@ namespace AlgoTrace.Server.Algorithms.Graph
                             }
                         );
 
-                        break; // Переходим к следующему ребру из файла A
+                        break; 
                     }
                 }
             }
 
-            // Математика правильная: считаем только относительно главного файла А
             similarityScore = Math.Min(100.0, ((double)edgeMatches / dataEdgesA.Count) * 100.0);
             similarityScore = Math.Round(similarityScore, 2);
 

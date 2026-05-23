@@ -84,7 +84,6 @@ namespace AlgoTrace.Server.Algorithms.Tree
             if (a.Type != b.Type || a.Children.Count != b.Children.Count)
                 return false;
 
-            // 1. Проверка контента узлов (Content Blindness)
             bool hasValueA = !string.IsNullOrWhiteSpace(a.Value);
             bool hasValueB = !string.IsNullOrWhiteSpace(b.Value);
 
@@ -108,7 +107,6 @@ namespace AlgoTrace.Server.Algorithms.Tree
             return true;
         }
 
-        // 3. Расширенный фильтр логических блоков
         private bool IsSignificantSubtree(UniversalNode node)
         {
             if (node.Children.Count == 0)

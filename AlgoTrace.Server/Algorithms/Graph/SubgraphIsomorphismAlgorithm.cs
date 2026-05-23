@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using AlgoTrace.Server.Interfaces;
 using AlgoTrace.Server.Models.DTO.Analysis;
 using AlgoTrace.Server.Models.Tree;
+using AlgoTrace.Server.Utils;
 using static AlgoTrace.Server.Algorithms.Graph.GraphUtils;
 
 namespace AlgoTrace.Server.Algorithms.Graph
@@ -25,7 +27,6 @@ namespace AlgoTrace.Server.Algorithms.Graph
             var localGraphA = GraphUtils.BuildGraph(treeA);
             var localGraphB = GraphUtils.BuildGraph(treeB);
 
-            // Присваиваем out параметрам значения
             graphA = localGraphA;
             graphB = localGraphB;
 
@@ -36,8 +37,22 @@ namespace AlgoTrace.Server.Algorithms.Graph
             {
                 return matches;
             }
+            
+            bool ignoreWhitespace = true;
+            if (parameters != null && parameters.TryGetValue("ignore_whitespace", out var wVal))
+            {
+                if (
+                    wVal is JsonElement elem
+                    && (
+                        elem.ValueKind == JsonValueKind.True
+                        || elem.ValueKind == JsonValueKind.False
+                    )
+                )
+                    ignoreWhitespace = elem.GetBoolean();
+                else if (wVal is bool b)
+                    ignoreWhitespace = b;
+            }
 
-            // Предохранитель от бесконечного зависания (задача NP-полная)
             int maxIterations =
                 parameters != null && parameters.ContainsKey("max_iterations")
                     ? Convert.ToInt32(parameters["max_iterations"])
@@ -46,24 +61,19 @@ namespace AlgoTrace.Server.Algorithms.Graph
 
             var bestMapping = new Dictionary<int, int>();
 
-            // Оптимизация: быстрый поиск ребер (Adjacency Lists)
             var outEdgesA = BuildAdjacencyList(localGraphA.Edges, true);
             var inEdgesA = BuildAdjacencyList(localGraphA.Edges, false);
 
-            // Хэш-сет для O(1) проверки существования ребра в графе B
             var edgesBSet = new HashSet<string>();
             foreach (var edge in localGraphB.Edges)
             {
                 edgesBSet.Add($"{edge.SourceId}_{edge.TargetId}_{edge.Type}");
             }
 
-            // Группировка узлов B по типу для быстрого поиска кандидатов
             var nodesBByType = localGraphB
                 .Nodes.GroupBy(n => n.Type)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
-            // Эвристика: сортируем узлы A по степени связности (Degree).
-            // Узлы с большим количеством связей отсекают неверные ветви раньше (как в алгоритме VF2).
             var sortedNodesA = localGraphA
                 .Nodes.OrderByDescending(n =>
                     (outEdgesA.ContainsKey(n.Id) ? outEdgesA[n.Id].Count : 0)
@@ -71,7 +81,6 @@ namespace AlgoTrace.Server.Algorithms.Graph
                 )
                 .ToList();
 
-            // Рекурсивный поиск с возвратом (Backtracking)
             void Backtrack(int uIndex, Dictionary<int, int> currentMapping)
             {
                 iterations++;
@@ -81,7 +90,6 @@ namespace AlgoTrace.Server.Algorithms.Graph
                 if (currentMapping.Count > bestMapping.Count)
                 {
                     bestMapping = new Dictionary<int, int>(currentMapping);
-                    // Если нашли полное совпадение всех узлов, прерываем поиск
                     if (bestMapping.Count == localGraphA.Nodes.Count)
                         return;
                 }
@@ -91,12 +99,21 @@ namespace AlgoTrace.Server.Algorithms.Graph
 
                 var nodeA = sortedNodesA[uIndex];
 
-                // Ищем возможных кандидатов в B (узлы с таким же типом)
                 if (nodesBByType.TryGetValue(nodeA.Type, out var candidatesB))
                 {
                     foreach (var nodeB in candidatesB)
                     {
                         if (currentMapping.ContainsValue(nodeB.Id))
+                            continue;
+
+                        var contentA = ignoreWhitespace
+                            ? SourceNormalizer.NormalizeLine(nodeA.Content, true)
+                            : nodeA.Content;
+                        var contentB = ignoreWhitespace
+                            ? SourceNormalizer.NormalizeLine(nodeB.Content, true)
+                            : nodeB.Content;
+
+                        if (contentA != contentB)
                             continue;
 
                         if (
@@ -105,7 +122,7 @@ namespace AlgoTrace.Server.Algorithms.Graph
                         {
                             currentMapping[nodeA.Id] = nodeB.Id;
                             Backtrack(uIndex + 1, currentMapping);
-                            currentMapping.Remove(nodeA.Id); // Возврат (backtrack)
+                            currentMapping.Remove(nodeA.Id);
 
                             if (
                                 iterations > maxIterations
@@ -116,7 +133,6 @@ namespace AlgoTrace.Server.Algorithms.Graph
                     }
                 }
 
-                // Также пробуем ветку, где этот узел не замаплен (чтобы найти максимальный ОБЩИЙ подграф, а не только полный)
                 Backtrack(uIndex + 1, currentMapping);
             }
 
@@ -125,7 +141,6 @@ namespace AlgoTrace.Server.Algorithms.Graph
             var nodesAById = localGraphA.Nodes.ToDictionary(n => n.Id);
             var nodesBById = localGraphB.Nodes.ToDictionary(n => n.Id);
 
-            // Формирование результатов
             foreach (var kvp in bestMapping)
             {
                 var nA = nodesAById[kvp.Key];
@@ -179,7 +194,6 @@ namespace AlgoTrace.Server.Algorithms.Graph
             HashSet<string> edgesBSet
         )
         {
-            // Проверяем исходящие ребра от nodeA к уже замапленным узлам
             if (outEdgesA.TryGetValue(nodeA.Id, out var outs))
             {
                 foreach (var edge in outs)
@@ -192,7 +206,6 @@ namespace AlgoTrace.Server.Algorithms.Graph
                 }
             }
 
-            // Проверяем входящие ребра от уже замапленных узлов к nodeA
             if (inEdgesA.TryGetValue(nodeA.Id, out var ins))
             {
                 foreach (var edge in ins)

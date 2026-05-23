@@ -35,10 +35,8 @@ namespace AlgoTrace.Server.Algorithms.Tree
                     ignoreWhitespace = b;
             }
 
-            // 3. Сохранять хеши только тех поддеревьев, размер которых >= 3 узлов.
             const int minSubtreeSize = 3;
 
-            // 4. Сбор данных для дерева А
             var hashesA = new Dictionary<int, UniversalNode>();
             ProcessNode(
                 treeA,
@@ -52,7 +50,6 @@ namespace AlgoTrace.Server.Algorithms.Tree
                 }
             );
 
-            // 4. Сбор данных для дерева B
             var hashesB = new HashSet<int>();
             ProcessNode(
                 treeB,
@@ -66,7 +63,6 @@ namespace AlgoTrace.Server.Algorithms.Tree
                 }
             );
 
-            // 5. Математика совпадений
             int matchCount = 0;
             var matches = new List<DetailedMatch>();
 
@@ -82,7 +78,7 @@ namespace AlgoTrace.Server.Algorithms.Tree
                             Type = "Identical Subtree Found",
                             Severity = "high",
                             LeftLines = GetLineRange(matchedNodeA),
-                            RightLines = new List<int>(), // Невозможно определить соответствующие строки в B
+                            RightLines = new List<int>(), 
                         }
                     );
                 }
@@ -90,7 +86,6 @@ namespace AlgoTrace.Server.Algorithms.Tree
 
             outMatches = matches;
 
-            // 6. Вычисление процента
             double similarityScore = 0;
             if (hashesA.Count > 0)
             {
@@ -100,7 +95,6 @@ namespace AlgoTrace.Server.Algorithms.Tree
             return Math.Round(similarityScore, 2);
         }
 
-        // 1. Рекурсивный обход
         private (int hash, int size) ProcessNode(
             UniversalNode node,
             bool ignoreWhitespace,
@@ -108,7 +102,6 @@ namespace AlgoTrace.Server.Algorithms.Tree
         )
         {
             var hash = new HashCode();
-            // 2. Точность контента
             hash.Add(node.Type);
             if (!string.IsNullOrWhiteSpace(node.Value))
             {
@@ -117,7 +110,7 @@ namespace AlgoTrace.Server.Algorithms.Tree
                 );
             }
 
-            int subtreeSize = 1; // Считаем текущий узел
+            int subtreeSize = 1;
 
             foreach (var child in node.Children)
             {

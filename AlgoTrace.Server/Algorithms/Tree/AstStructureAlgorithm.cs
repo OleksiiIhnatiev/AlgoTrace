@@ -42,7 +42,6 @@ namespace AlgoTrace.Server.Algorithms.Tree
             if (treeA == null || treeB == null)
                 return 0;
 
-            // 3. Честная математика: Считаем только размер файла А
             int totalNodesA = GetSubtreeSize(treeA);
             if (totalNodesA == 0)
                 return 0;
@@ -50,17 +49,19 @@ namespace AlgoTrace.Server.Algorithms.Tree
             var matchedNodesB = new HashSet<UniversalNode>();
             int matchedNodesCount = 0;
 
-            // 1. Никакого Flatten: Рекурсивный обход сверху вниз
             void TraverseAndMatch(UniversalNode nodeA)
             {
+                int sizeA = GetSubtreeSize(nodeA);
+                
+                if (sizeA < 3)
+                    return;
+
                 var matchB = FindMatchInB(nodeA, treeB, matchedNodesB, ignoreWhitespace);
 
                 if (matchB != null)
                 {
-                    int sizeA = GetSubtreeSize(nodeA);
                     matchedNodesCount += sizeA;
 
-                    // 4. Защита от двойного счета: помечаем все узлы поддерева B как использованные
                     MarkSubtreeAsMatched(matchB, matchedNodesB);
 
                     var subtreeNodesA = new List<UniversalNode>();
@@ -82,11 +83,9 @@ namespace AlgoTrace.Server.Algorithms.Tree
                         }
                     );
 
-                    // Важно: мы НЕ идем вглубь nodeA, так как все его поддерево уже найдено целиком!
                 }
                 else
                 {
-                    // Если совпадений для крупного поддерева нет, ищем совпадения для его детей
                     foreach (var childA in nodeA.Children)
                     {
                         TraverseAndMatch(childA);
@@ -142,7 +141,7 @@ namespace AlgoTrace.Server.Algorithms.Tree
                         $"{submissionPrefix}_{c.GetHashCode()}"
                     )
                     .ToList(),
-                Location = node.Location ?? new CodeLocation(), // Handle null location
+                Location = node.Location ?? new CodeLocation(),
             };
         }
 
@@ -158,7 +157,6 @@ namespace AlgoTrace.Server.Algorithms.Tree
             if (a.Type != b.Type || a.Children.Count != b.Children.Count)
                 return false;
 
-            // 2. Точное сравнение узлов (контент тоже должен совпадать)
             bool hasValueA = !string.IsNullOrWhiteSpace(a.Value);
             bool hasValueB = !string.IsNullOrWhiteSpace(b.Value);
             if (hasValueA || hasValueB)
